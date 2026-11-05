@@ -155,9 +155,10 @@ def seed_database(db: Session, force: bool = False):
             protocol=cfg["protocol"],
             traffic_level=cfg["traffic_level"],
             data_rate=cfg["data_rate"],
+            delay=cfg.get("delay", "20ms"),
             simulation_time=cfg["simulation_time"],
             experiment_type=cfg["experiment_type"],
-            status="COMPLETED",
+            status="completed",
             is_demo=cfg["is_demo"],
             created_at=base_time + datetime.timedelta(minutes=i * 25)
         )
@@ -172,7 +173,8 @@ def seed_database(db: Session, force: bool = False):
             protocol=exp.protocol,
             bottleneck_bw=exp.data_rate,
             sim_time=exp.simulation_time,
-            experiment_type=exp.experiment_type
+            experiment_type=exp.experiment_type,
+            bottleneck_delay=exp.delay
         )
 
         tr_filename = f"experiment_{exp.id}.tr"

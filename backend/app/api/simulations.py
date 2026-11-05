@@ -26,8 +26,12 @@ def trigger_simulation(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    total = db.query(Experiment).count()
-    exp_code = f"EXP-{total + 1:03d}"
+    # Ensure unique exp_code even after deletions
+    counter = db.query(Experiment).count() + 1
+    exp_code = f"EXP-{counter:03d}"
+    while db.query(Experiment).filter(Experiment.exp_code == exp_code).first():
+        counter += 1
+        exp_code = f"EXP-{counter:03d}"
 
     # If user explicitly selected demo mode, set is_demo=True, otherwise keep False for Live NS-2 run
     is_demo = bool(config.force_demo)
@@ -40,9 +44,10 @@ def trigger_simulation(
         protocol=config.protocol.upper(),
         traffic_level=config.traffic_level,
         data_rate=config.data_rate,
+        delay=config.delay,
         simulation_time=config.simulation_time,
         experiment_type=config.experiment_type,
-        status="PENDING",
+        status="pending",
         is_demo=is_demo
     )
     db.add(exp)
@@ -51,12 +56,12 @@ def trigger_simulation(
 
     # Initialize in-memory status
     active_simulations[exp.id] = {
-        "status": "preparing",
-        "progress": 10,
-        "progress_percent": 10,
-        "current_stage": "preparing",
+        "status": "pending",
+        "progress": 5,
+        "progress_percent": 5,
+        "current_stage": "pending",
         "message": f"Simulation queued: {exp.exp_code}",
-        "stage_message": "Preparing Simulation",
+        "stage_message": "Simulation Pending",
         "logs": [f"Created experiment record {exp.exp_code}"],
         "error": None
     }
@@ -68,12 +73,12 @@ def trigger_simulation(
         id=exp.id,
         exp_code=exp.exp_code,
         experiment_id=exp.exp_code,
-        status="preparing",
-        progress=10,
-        progress_percent=10,
-        current_stage="preparing",
+        status="pending",
+        progress=5,
+        progress_percent=5,
+        current_stage="pending",
         message=f"Simulation queued: {exp.exp_code}",
-        stage_message="Preparing Simulation",
+        stage_message="Simulation Pending",
         logs=active_simulations[exp.id]["logs"],
         error=None,
         result=None
@@ -148,18 +153,25 @@ def get_simulation_results(id: int, db: Session = Depends(get_db)):
 @router.post("/run-full-analysis")
 async def trigger_full_analysis():
     """Executes the complete academic suite of NS-2 simulations across all presets and protocols."""
-    results = await run_full_analysis_pipeline(SessionLocal)
-    return {"message": "Full NS-2 analysis suite completed successfully", "results": results}
+    try:
+        results = await run_full_analysis_pipeline(SessionLocal)
+        return {"message": "Full NS-2 analysis suite completed successfully", "results": results}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.post("/run-gbn", response_model=GbnSimulationResponse)
 async def trigger_gbn_simulation(config: GbnSimulationRequest):
     """Runs a live NS-2 Go-Back-N simulation (Agent/TCP Tahoe) with packet drops and retransmissions."""
-    res = await run_gbn_simulation(
-        window_size=config.window_size,
-        loss_rate=config.loss_rate,
-        sim_time=config.simulation_time
-    )
-    return GbnSimulationResponse(**res)
+    try:
+        res = await run_gbn_simulation(
+            window_size=config.window_size,
+            loss_rate=config.loss_rate,
+            sim_time=config.simulation_time,
+            force_demo=bool(config.force_demo)
+        )
+        return GbnSimulationResponse(**res)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.get("/gbn-latest", response_model=Optional[GbnSimulationResponse])
 def get_latest_gbn():
@@ -170,12 +182,16 @@ def get_latest_gbn():
 @router.post("/run-leaky-bucket", response_model=LeakyBucketResponse)
 async def trigger_leaky_bucket_simulation(config: LeakyBucketRequest):
     """Runs paired live NS-2 simulations for bursty traffic with and without Leaky Bucket shaping."""
-    res = await run_leaky_bucket_simulation(
-        bucket_size=config.bucket_size,
-        leak_rate=config.leak_rate,
-        sim_time=config.simulation_time
-    )
-    return LeakyBucketResponse(**res)
+    try:
+        res = await run_leaky_bucket_simulation(
+            bucket_size=config.bucket_size,
+            leak_rate=config.leak_rate,
+            sim_time=config.simulation_time,
+            force_demo=bool(config.force_demo)
+        )
+        return LeakyBucketResponse(**res)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.get("/leaky-bucket-latest", response_model=Optional[LeakyBucketResponse])
 def get_latest_leaky_bucket():
@@ -186,8 +202,11 @@ def get_latest_leaky_bucket():
 @router.post("/run-tcp-udp-batch")
 async def trigger_tcp_udp_batch():
     """Runs live NS-2 multi-rate benchmarks (256K, 512K, 1M, 2M, 5M) for TCP vs UDP."""
-    table = await run_tcp_udp_comparison_batch(SessionLocal)
-    return {"message": "TCP vs UDP multi-rate benchmarks completed successfully", "data": table}
+    try:
+        table = await run_tcp_udp_comparison_batch(SessionLocal)
+        return {"message": "TCP vs UDP multi-rate benchmarks completed successfully", "data": table}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.websocket("/ws/{id}")
 async def simulation_websocket_endpoint(websocket: WebSocket, id: int):

@@ -1,11 +1,14 @@
 import os
+import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-from .database import engine, Base, SessionLocal
+from .database import engine, Base, SessionLocal, init_db
 from .models import Experiment
 from .services.seed_data import seed_database
 from .api import dashboard, experiments, simulations, reports, system
@@ -13,8 +16,8 @@ from .api import dashboard, experiments, simulations, reports, system
 # Application lifespan for DB init and initial seeding
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables
-    Base.metadata.create_all(bind=engine)
+    # Initialize database tables and migrations
+    init_db()
     
     # Check and automatically seed calibrated academic benchmarks if DB is fresh
     db = SessionLocal()
@@ -23,6 +26,8 @@ async def lifespan(app: FastAPI):
             print("[EduNet Analyzer] First run detected: Seeding academic laboratory baseline experiments...")
             seed_database(db, force=False)
             print("[EduNet Analyzer] Database seeded successfully.")
+    except Exception as e:
+        print(f"[EduNet Analyzer] Warning during database seeding: {e}")
     finally:
         db.close()
     
@@ -35,20 +40,65 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS (support CORS_ORIGINS env var or wildcard by default)
+# Exception Handlers
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        loc = " -> ".join(str(l) for l in err.get("loc", []))
+        errors.append(f"{loc}: {err.get('msg', 'Invalid value')}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": "Validation Error",
+            "detail": "; ".join(errors) if errors else "Invalid request parameters",
+            "validation_errors": jsonable_encoder(exc.errors())
+        }
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "HTTP Error",
+            "detail": exc.detail,
+            "status_code": exc.status_code
+        }
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": "Internal Server Error",
+            "detail": str(exc),
+            "status_code": 500
+        }
+    )
+
+# Enable CORS with localhost regex support
 cors_env = os.getenv("CORS_ORIGINS", "*")
 if cors_env.strip() == "*":
-    origins = ["*"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 else:
     origins = [orig.strip() for orig in cors_env.split(",") if orig.strip()]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Register API Routers under /api
 app.include_router(dashboard.router, prefix="/api")

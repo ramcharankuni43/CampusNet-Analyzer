@@ -27,6 +27,9 @@ def parse_ns2_trace_file(
     if not os.path.exists(trace_path):
         raise FileNotFoundError(f"Trace file not found at {trace_path}")
 
+    if os.path.getsize(trace_path) == 0:
+        raise ValueError(f"Trace file at {trace_path} is empty (0 bytes).")
+
     sent_packets = 0
     received_packets = 0
     dropped_packets = 0
@@ -154,6 +157,9 @@ def parse_gbn_sequence_trace(
     """
     if not os.path.exists(trace_path):
         raise FileNotFoundError(f"Trace file not found at {trace_path}")
+
+    if os.path.getsize(trace_path) == 0:
+        raise ValueError(f"Trace file at {trace_path} is empty (0 bytes).")
 
     trace_points = []
     seen_seqs = set()

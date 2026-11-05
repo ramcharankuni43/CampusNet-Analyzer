@@ -39,6 +39,24 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+def init_db():
+    """Initializes tables and performs lightweight migrations for SQLite if needed."""
+    Base.metadata.create_all(bind=engine)
+    if is_sqlite:
+        with engine.connect() as conn:
+            # Check existing columns on experiments table using PRAGMA table_info
+            try:
+                res = conn.exec_driver_sql("PRAGMA table_info(experiments)").fetchall()
+                col_names = [row[1] for row in res] if res else []
+                if col_names:
+                    if "delay" not in col_names:
+                        conn.exec_driver_sql("ALTER TABLE experiments ADD COLUMN delay VARCHAR(32) DEFAULT '20ms'")
+                    if "output_dir" not in col_names:
+                        conn.exec_driver_sql("ALTER TABLE experiments ADD COLUMN output_dir VARCHAR(256)")
+                    conn.commit()
+            except Exception:
+                pass
+
 def get_db():
     db = SessionLocal()
     try:

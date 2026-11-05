@@ -16,9 +16,11 @@ class Experiment(Base):
     data_rate = Column(String(32), nullable=False, default="1 Mbps")
     simulation_time = Column(Float, nullable=False, default=60.0)
     experiment_type = Column(String(64), nullable=False, default="Normal Traffic")
+    delay = Column(String(32), nullable=True, default="20ms")
     status = Column(String(32), nullable=False, default="PENDING")
     is_demo = Column(Boolean, default=False)
     trace_file = Column(String(256), nullable=True)
+    output_dir = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     result = relationship("Result", back_populates="experiment", uselist=False, cascade="all, delete-orphan")

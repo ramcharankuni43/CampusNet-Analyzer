@@ -39,6 +39,9 @@ backend/*.db-journal
 simulation/traces/*.tr
 simulation/traces/*.nam
 simulation/generated/*.tcl
+simulation/runs/*
+simulation/runs/*/
+!simulation/runs/.gitkeep
 !simulation/generated/.gitkeep
 !simulation/traces/.gitkeep
 backend/app/traces/*.tr

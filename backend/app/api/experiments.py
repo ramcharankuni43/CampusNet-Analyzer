@@ -40,11 +40,13 @@ def format_experiment_response(exp: Experiment) -> ExperimentResponse:
         protocol=exp.protocol,
         traffic_level=exp.traffic_level,
         data_rate=exp.data_rate,
+        delay=exp.delay or "20ms",
         simulation_time=exp.simulation_time,
         experiment_type=exp.experiment_type,
         status=exp.status,
         is_demo=exp.is_demo,
         trace_file=exp.trace_file,
+        output_dir=exp.output_dir,
         created_at=exp.created_at,
         result=res_resp
     )
@@ -101,8 +103,11 @@ def get_experiment_by_id(id: int, mode: Optional[str] = None, db: Session = Depe
 
 @router.post("", response_model=ExperimentResponse)
 def create_experiment(config: SimulationConfigCreate, db: Session = Depends(get_db)):
-    total = db.query(Experiment).count()
-    exp_code = f"EXP-{total + 1:03d}"
+    counter = db.query(Experiment).count() + 1
+    exp_code = f"EXP-{counter:03d}"
+    while db.query(Experiment).filter(Experiment.exp_code == exp_code).first():
+        counter += 1
+        exp_code = f"EXP-{counter:03d}"
 
     exp = Experiment(
         exp_code=exp_code,
@@ -112,10 +117,11 @@ def create_experiment(config: SimulationConfigCreate, db: Session = Depends(get_
         protocol=config.protocol.upper(),
         traffic_level=config.traffic_level,
         data_rate=config.data_rate,
+        delay=config.delay,
         simulation_time=config.simulation_time,
         experiment_type=config.experiment_type,
-        status="PENDING",
-        is_demo=config.force_demo or False
+        status="pending",
+        is_demo=bool(config.force_demo)
     )
     db.add(exp)
     db.commit()
@@ -128,12 +134,27 @@ def delete_experiment(id: int, db: Session = Depends(get_db)):
     if not exp:
         raise HTTPException(status_code=404, detail=f"Experiment with ID {id} not found")
 
-    # Clean up associated trace file if present
-    if exp.trace_file and os.path.exists(exp.trace_file):
-        try:
-            os.remove(exp.trace_file)
-        except OSError:
-            pass
+    from ..services.simulation_service import SIMULATION_DIR
+    sim_base_path = os.path.abspath(SIMULATION_DIR)
+
+    # Clean up output directory if present and strictly inside SIMULATION_DIR
+    if exp.output_dir:
+        abs_out = os.path.abspath(exp.output_dir)
+        if abs_out.startswith(sim_base_path) and os.path.exists(abs_out):
+            try:
+                import shutil
+                shutil.rmtree(abs_out, ignore_errors=True)
+            except OSError:
+                pass
+
+    # Clean up associated trace file if present and strictly inside SIMULATION_DIR
+    if exp.trace_file:
+        abs_tf = os.path.abspath(exp.trace_file)
+        if abs_tf.startswith(sim_base_path) and os.path.exists(abs_tf):
+            try:
+                os.remove(abs_tf)
+            except OSError:
+                pass
 
     db.delete(exp)
     db.commit()
