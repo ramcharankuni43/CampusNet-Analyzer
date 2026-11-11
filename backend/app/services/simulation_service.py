@@ -646,6 +646,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
                         f"[{time.strftime('%H:%M:%S')}] [ERROR] NS-2 returned exit code {proc.returncode}: {err_text}"
                     )
                     exp.status = "failed"
+                    exp.error_message = err_msg
                     db.commit()
                     await ws_manager.broadcast_sim(experiment_id, active_simulations[experiment_id])
                     return

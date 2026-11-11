@@ -1,10 +1,15 @@
 import os
+import asyncio
+from unittest.mock import patch, MagicMock, AsyncMock
+from sqlalchemy import text
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import SessionLocal, Base, engine, init_db
+from app.models import Experiment, Result
 from app.services.seed_data import seed_database
 from app.services.trace_parser import parse_ns2_trace_file
+from app.services.simulation_service import run_simulation_task, check_ns2_installation
 
 client = TestClient(app)
 
@@ -332,4 +337,268 @@ def test_simulation_results_endpoint():
     assert data["id"] == first_id
     assert data["result"] is not None
     assert data["result"]["throughput_kbps"] > 0
+
+def test_app_startup_metadata():
+    assert app.title == "EduNet Analyzer API"
+    paths = app.openapi()["paths"]
+    assert "/api/health" in paths
+    assert "/api/dashboard/summary" in paths
+    assert "/api/experiments" in paths
+    assert "/api/simulations/run" in paths
+    assert "/api/system/status" in paths
+
+def test_simulation_invalid_configurations_comprehensive():
+    # 1. Zero or negative duration
+    r_dur_zero = client.post("/api/experiments", json={"duration": 0, "protocol": "TCP"})
+    assert r_dur_zero.status_code == 422
+    r_dur_neg = client.post("/api/experiments", json={"duration": -15, "protocol": "TCP"})
+    assert r_dur_neg.status_code == 422
+
+    # 2. Invalid protocol
+    r_proto = client.post("/api/experiments", json={"protocol": "QUIC"})
+    assert r_proto.status_code == 422
+
+    # 3. Non-numeric bandwidth string
+    r_bw = client.post("/api/experiments", json={"bandwidth": "unlimited-speed", "protocol": "TCP"})
+    assert r_bw.status_code == 422
+
+    # 4. Non-numeric delay string
+    r_delay = client.post("/api/experiments", json={"delay": "immediate", "protocol": "TCP"})
+    assert r_delay.status_code == 422
+
+    # 5. Out of bounds users
+    r_low_users = client.post("/api/experiments", json={"students": -2})
+    assert r_low_users.status_code == 422
+    r_high_users = client.post("/api/experiments", json={"students": 300})
+    assert r_high_users.status_code == 422
+
+def test_database_initialization_and_migration():
+    # Calling init_db should be idempotent and ensure schema has error_message
+    init_db()
+    with engine.connect() as conn:
+        res = conn.execute(text("PRAGMA table_info(experiments)")).fetchall()
+        column_names = [row[1] for row in res]
+        assert "id" in column_names
+        assert "exp_code" in column_names
+        assert "error_message" in column_names
+        assert "status" in column_names
+        assert "users" in column_names
+
+def test_simulation_execution_success_task():
+    db = SessionLocal()
+    try:
+        exp = Experiment(
+            exp_code=f"EXP-SUCCESS-{os.getpid()}",
+            name="Success Verification Test",
+            users=15,
+            protocol="TCP",
+            traffic_level="Low",
+            data_rate="1Mb",
+            delay="15ms",
+            simulation_time=5.0,
+            experiment_type="Normal Traffic",
+            status="pending",
+            is_demo=True
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        exp_id = exp.id
+
+        # Run worker task directly
+        asyncio.run(run_simulation_task(exp_id, SessionLocal))
+
+        db.expire_all()
+        updated_exp = db.query(Experiment).filter(Experiment.id == exp_id).first()
+        assert updated_exp.status == "completed"
+        assert updated_exp.result is not None
+        assert updated_exp.result.throughput_kbps > 0
+        assert updated_exp.result.packet_delivery_ratio > 0
+        assert updated_exp.trace_file is not None
+        assert os.path.exists(updated_exp.trace_file)
+    finally:
+        db.close()
+
+def test_simulation_execution_failure_handling():
+    db = SessionLocal()
+    try:
+        exp = Experiment(
+            exp_code=f"EXP-FAIL-{os.getpid()}",
+            name="Failure Handling Test",
+            users=10,
+            protocol="TCP",
+            traffic_level="Low",
+            data_rate="1Mb",
+            delay="20ms",
+            simulation_time=5.0,
+            experiment_type="Normal Traffic",
+            status="pending",
+            is_demo=False
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        exp_id = exp.id
+
+        # Mock NS-2 execution failure (proc returns non-zero exit code 1)
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 1
+        mock_proc.communicate = AsyncMock(return_value=(b"", b"syntax error in Tcl script: invalid command name 'node'"))
+
+        with patch("app.services.simulation_service.check_ns2_installation", return_value={"installed": True, "mode": "native", "cmd": ["ns"]}):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+                asyncio.run(run_simulation_task(exp_id, SessionLocal))
+
+        db.expire_all()
+        updated_exp = db.query(Experiment).filter(Experiment.id == exp_id).first()
+        assert updated_exp.status == "failed"
+        assert updated_exp.error_message is not None
+        assert "NS-2 returned exit code 1" in updated_exp.error_message
+    finally:
+        db.close()
+
+def test_subprocess_timeout_handling():
+    db = SessionLocal()
+    try:
+        exp = Experiment(
+            exp_code=f"EXP-TIMEOUT-{os.getpid()}",
+            name="Timeout Handling Test",
+            users=10,
+            protocol="TCP",
+            traffic_level="High",
+            data_rate="1Mb",
+            delay="20ms",
+            simulation_time=5.0,
+            experiment_type="Normal Traffic",
+            status="pending",
+            is_demo=False
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        exp_id = exp.id
+
+        mock_proc = AsyncMock()
+        mock_proc.returncode = None
+
+        with patch("app.services.simulation_service.check_ns2_installation", return_value={"installed": True, "mode": "native", "cmd": ["ns"]}):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+                with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError("NS-2 process timed out after 90 seconds")):
+                    asyncio.run(run_simulation_task(exp_id, SessionLocal))
+
+        db.expire_all()
+        updated_exp = db.query(Experiment).filter(Experiment.id == exp_id).first()
+        assert updated_exp.status == "failed"
+        assert updated_exp.error_message is not None
+        assert "timed out" in updated_exp.error_message.lower() or "exception" in updated_exp.error_message.lower()
+    finally:
+        db.close()
+
+def test_missing_ns2_dependency_behavior():
+    db = SessionLocal()
+    try:
+        exp = Experiment(
+            exp_code=f"EXP-NONS2-{os.getpid()}",
+            name="Missing Dependency Test",
+            users=10,
+            protocol="TCP",
+            traffic_level="Low",
+            data_rate="1Mb",
+            delay="20ms",
+            simulation_time=5.0,
+            experiment_type="Normal Traffic",
+            status="pending",
+            is_demo=False
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        exp_id = exp.id
+
+        with patch("app.services.simulation_service.check_ns2_installation", return_value={"installed": False, "mode": "none", "diagnostic": "ns not found on PATH"}):
+            asyncio.run(run_simulation_task(exp_id, SessionLocal))
+
+        db.expire_all()
+        updated_exp = db.query(Experiment).filter(Experiment.id == exp_id).first()
+        assert updated_exp.status == "failed"
+        assert updated_exp.error_message is not None
+        assert "not available on this system" in updated_exp.error_message
+    finally:
+        db.close()
+
+def test_trace_file_missing_or_empty_failure(tmp_path):
+    db = SessionLocal()
+    try:
+        exp = Experiment(
+            exp_code=f"EXP-NOTRACE-{os.getpid()}",
+            name="Trace Missing Test",
+            users=10,
+            protocol="TCP",
+            traffic_level="Low",
+            data_rate="1Mb",
+            delay="20ms",
+            simulation_time=5.0,
+            experiment_type="Normal Traffic",
+            status="pending",
+            is_demo=False
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        exp_id = exp.id
+
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"Simulation complete", b""))
+
+        # In this test, the subprocess runs successfully, but no trace file is created
+        with patch("app.services.simulation_service.check_ns2_installation", return_value={"installed": True, "mode": "native", "cmd": ["ns"]}):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+                asyncio.run(run_simulation_task(exp_id, SessionLocal))
+
+        db.expire_all()
+        updated_exp = db.query(Experiment).filter(Experiment.id == exp_id).first()
+        assert updated_exp.status == "failed"
+        assert updated_exp.error_message is not None
+        assert "Trace Validation Failed" in updated_exp.error_message
+    finally:
+        db.close()
+
+def test_simulation_history_ordering_and_fields():
+    response = client.get("/api/simulations")
+    assert response.status_code == 200
+    sims = response.json()
+    assert len(sims) >= 8
+
+    # Verify fields in every record
+    required_fields = ["id", "exp_code", "users", "protocol", "traffic_level", "data_rate", "delay", "simulation_time", "status"]
+    for s in sims[:5]:
+        for f in required_fields:
+            assert f in s, f"Field '{f}' missing from simulation record"
+
+    # Verify descending chronological ordering (newest ID or timestamp first)
+    ids = [s["id"] for s in sims]
+    assert ids == sorted(ids, reverse=True), "Simulations must be ordered newest first"
+
+def test_experiment_comparison_rule_based_interpretation():
+    response = client.get("/api/simulations")
+    sims = response.json()
+    completed_sims = [s for s in sims if s.get("result") is not None]
+    assert len(completed_sims) >= 2
+
+    # Pick two simulations (e.g. low load and high load)
+    id1 = completed_sims[-1]["id"]
+    id2 = completed_sims[0]["id"]
+
+    comp_resp = client.get(f"/api/simulations/compare?ids={id1},{id2}")
+    assert comp_resp.status_code == 200
+    comp_data = comp_resp.json()
+    assert "analysis_summary" in comp_data
+    summary = comp_data["analysis_summary"]
+    assert isinstance(summary, str)
+    assert len(summary) > 20
+    # Rule-based observations should discuss throughput, users, or protocols
+    assert any(term in summary.lower() for term in ["throughput", "packet", "pdr", "loss", "delay", "workload"])
+
+
 
