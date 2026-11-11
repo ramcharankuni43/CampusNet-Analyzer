@@ -321,6 +321,8 @@ export const DEMO_EXPERIMENTS: Experiment[] = [
 export const DEMO_DASHBOARD_SUMMARY = {
   kpis: {
     total_experiments: DEMO_EXPERIMENTS.length,
+    completed_experiments: DEMO_EXPERIMENTS.filter((e) => e.status === 'COMPLETED').length,
+    failed_experiments: 0,
     avg_throughput_kbps: Math.round((DEMO_EXPERIMENTS.reduce((acc, e) => acc + (e.result?.throughput_kbps || 0), 0) / DEMO_EXPERIMENTS.length) * 10) / 10,
     avg_packet_loss_percent: Math.round((DEMO_EXPERIMENTS.reduce((acc, e) => acc + (e.result?.packet_loss_percent || 0), 0) / DEMO_EXPERIMENTS.length) * 10) / 10,
     avg_delay_ms: Math.round((DEMO_EXPERIMENTS.reduce((acc, e) => acc + (e.result?.average_delay_ms || 0), 0) / DEMO_EXPERIMENTS.length) * 10) / 10,

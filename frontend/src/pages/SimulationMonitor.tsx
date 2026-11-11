@@ -48,6 +48,7 @@ export const SimulationMonitor: React.FC = () => {
   const [simId, setSimId] = useState<number | null>(queryId ? parseInt(queryId, 10) : null);
   const [statusData, setStatusData] = useState<SimulationStatusResponse | null>(null);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [activeExp, setActiveExp] = useState<Experiment | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [isLiveWs, setIsLiveWs] = useState<boolean>(false);
@@ -63,6 +64,12 @@ export const SimulationMonitor: React.FC = () => {
         }
       }).catch(() => null);
     }
+  }, [simId]);
+
+  // Load active experiment configuration record
+  useEffect(() => {
+    if (!simId) return;
+    api.getExperimentById(simId).then(setActiveExp).catch(() => null);
   }, [simId]);
 
   // Real-time WebSocket subscription with polling fallback
@@ -212,6 +219,56 @@ export const SimulationMonitor: React.FC = () => {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Configuration Summary Card */}
+      <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F1F5F9] pb-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-bold text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+              {activeExp?.exp_code || statusData?.exp_code || `EXP-${simId}`}
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+              isCompleted
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : isFailed
+                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
+            }`}>
+              {statusData?.status || activeExp?.status || 'PENDING'}
+            </span>
+          </div>
+          <div className="text-xs text-slate-500 font-medium">
+            {activeExp?.name || 'Simulation Run'}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Student Nodes</span>
+            <span className="font-mono font-bold text-[#0F172A]">{activeExp?.users ?? '—'} nodes</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Protocol</span>
+            <span className="font-bold text-blue-700">{activeExp?.protocol ?? '—'}</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Bottleneck Rate</span>
+            <span className="font-mono font-bold text-[#0F172A]">{activeExp?.data_rate ?? '—'}</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Link Delay</span>
+            <span className="font-mono font-bold text-[#0F172A]">{activeExp?.delay || '20ms'}</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Duration</span>
+            <span className="font-mono font-bold text-[#0F172A]">{activeExp?.simulation_time ? `${activeExp.simulation_time}s` : '—'}</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Scenario</span>
+            <span className="font-medium text-[#0F172A] truncate block" title={activeExp?.experiment_type}>{activeExp?.experiment_type ?? 'Normal'}</span>
+          </div>
+        </div>
+      </div>
 
       {/* Progress & Stage Stepper */}
       <div className="bg-white p-4 sm:p-6 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4 sm:space-y-6">

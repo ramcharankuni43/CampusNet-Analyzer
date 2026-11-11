@@ -213,6 +213,8 @@ class ExperimentResponse(BaseModel):
 
 class DashboardKPIs(BaseModel):
     total_experiments: int
+    completed_experiments: Optional[int] = 0
+    failed_experiments: Optional[int] = 0
     avg_throughput_kbps: float
     avg_packet_loss_percent: float
     avg_delay_ms: float

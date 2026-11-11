@@ -239,15 +239,14 @@ export const ExperimentHistory: React.FC = () => {
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">Experiment</th>
                 <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">Users</th>
+                <th className="px-4 py-3">Configuration</th>
                 <th className="px-4 py-3">Protocol</th>
-                <th className="px-4 py-3">Traffic</th>
-                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Throughput</th>
                 <th className="px-4 py-3">Packet Loss</th>
                 <th className="px-4 py-3">Delay</th>
-                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">PDR</th>
+                <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -325,12 +324,15 @@ export const ExperimentHistory: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 font-medium text-[#0F172A] max-w-xs">
                         <div className="truncate font-semibold">{exp.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate">{exp.data_rate}</div>
+                        <div className="text-[10px] text-slate-400 truncate">{exp.experiment_type}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <ModeBadge isDemo={exp.is_demo} />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-mono">{exp.users} nodes</td>
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-[#334155]">
+                        <div><strong>{exp.users}</strong> nodes &bull; {exp.data_rate}</div>
+                        <div className="text-[10px] text-slate-400">Delay: {exp.delay || '20ms'} &bull; {exp.traffic_level}</div>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
@@ -342,14 +344,23 @@ export const ExperimentHistory: React.FC = () => {
                           {exp.protocol}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-[#475569]">{exp.traffic_level}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-[11px] text-[#64748B]">
-                        {exp.experiment_type}
-                      </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {exp.status}
-                        </span>
+                        {String(exp.status).toLowerCase() === 'completed' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            COMPLETED
+                          </span>
+                        ) : String(exp.status).toLowerCase() === 'failed' ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200"
+                            title={exp.error_message || 'Execution Failed'}
+                          >
+                            FAILED
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            {exp.status.toUpperCase()}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-mono font-semibold text-[#0F172A] whitespace-nowrap">
                         {exp.result ? `${exp.result.throughput_kbps} Kbps` : '—'}
@@ -359,6 +370,9 @@ export const ExperimentHistory: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
                         {exp.result ? `${exp.result.average_delay_ms} ms` : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-emerald-700 font-semibold whitespace-nowrap">
+                        {exp.result ? `${exp.result.packet_delivery_ratio}%` : '—'}
                       </td>
                       <td className="px-4 py-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
                         {formattedDate}

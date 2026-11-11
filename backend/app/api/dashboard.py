@@ -30,6 +30,8 @@ def get_dashboard_summary(mode: Optional[str] = None, db: Session = Depends(get_
     results = db.query(Result).filter(Result.experiment_id.in_(exp_ids)).all() if exp_ids else []
 
     total_exps = len(experiments)
+    completed_exps = sum(1 for e in experiments if str(e.status).lower() in ("completed", "complete"))
+    failed_exps = sum(1 for e in experiments if str(e.status).lower() in ("failed", "fail"))
 
     if results:
         avg_tp = round(sum(r.throughput_kbps for r in results) / len(results), 2)
@@ -41,6 +43,8 @@ def get_dashboard_summary(mode: Optional[str] = None, db: Session = Depends(get_
 
     kpis = DashboardKPIs(
         total_experiments=total_exps,
+        completed_experiments=completed_exps,
+        failed_experiments=failed_exps,
         avg_throughput_kbps=avg_tp,
         avg_packet_loss_percent=avg_loss,
         avg_delay_ms=avg_delay,

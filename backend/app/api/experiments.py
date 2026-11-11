@@ -221,22 +221,76 @@ def perform_comparison(experiment_ids: List[int], db: Session) -> ComparisonResp
         chart_delay.append({"name": f"{e.exp_code} ({e.protocol})", "delay": delay, "users": e.users})
         chart_pdr.append({"name": f"{e.exp_code} ({e.protocol})", "pdr": pdr, "users": e.users})
 
-    # Generate analytical observation
-    tcp_runs = [m for m in metrics_table if m["protocol"] == "TCP"]
-    udp_runs = [m for m in metrics_table if m["protocol"] == "UDP"]
-    
+    # Rule-Based Analytical Interpretation (Phase 7)
     notes = []
-    if tcp_runs and udp_runs:
-        avg_tcp_pdr = sum(m["pdr_percent"] for m in tcp_runs) / len(tcp_runs)
-        avg_udp_pdr = sum(m["pdr_percent"] for m in udp_runs) / len(udp_runs)
-        notes.append(f"TCP maintained higher reliability ({avg_tcp_pdr:.1f}% PDR) compared to UDP ({avg_udp_pdr:.1f}% PDR) due to retransmission.")
-    
-    high_user_runs = [m for m in metrics_table if m["users"] >= 50]
-    low_user_runs = [m for m in metrics_table if m["users"] < 50]
-    if high_user_runs and low_user_runs:
-        avg_high_loss = sum(m["packet_loss_percent"] for m in high_user_runs) / len(high_user_runs)
-        avg_low_loss = sum(m["packet_loss_percent"] for m in low_user_runs) / len(low_user_runs)
-        notes.append(f"Heavy student concurrency (>=50 users) increased queue drops from {avg_low_loss:.1f}% to {avg_high_loss:.1f}%.")
+
+    # Head-to-Head 2-experiment comparison analysis
+    if len(metrics_table) == 2:
+        m1, m2 = metrics_table[0], metrics_table[1]
+        
+        # User concurrency comparison
+        if m2["users"] != m1["users"]:
+            diff_u = m2["users"] - m1["users"]
+            direction = "increased" if diff_u > 0 else "decreased"
+            notes.append(f"Workload {direction} from {m1['users']} to {m2['users']} student nodes ({abs(diff_u):+d} users).")
+
+        # Throughput comparison
+        if m1["throughput_kbps"] > 0 and m2["throughput_kbps"] > 0:
+            diff_tp = round(m2["throughput_kbps"] - m1["throughput_kbps"], 2)
+            pct_tp = round((diff_tp / m1["throughput_kbps"]) * 100, 1)
+            if diff_tp < -0.1:
+                notes.append(f"Throughput decreased by {abs(diff_tp):.2f} Kbps ({pct_tp}%), dropping from {m1['throughput_kbps']:.2f} Kbps to {m2['throughput_kbps']:.2f} Kbps.")
+            elif diff_tp > 0.1:
+                notes.append(f"Throughput increased by {diff_tp:.2f} Kbps (+{pct_tp}%), rising from {m1['throughput_kbps']:.2f} Kbps to {m2['throughput_kbps']:.2f} Kbps.")
+            else:
+                notes.append(f"Throughput remained steady at approximately {m1['throughput_kbps']:.2f} Kbps.")
+
+        # Packet Loss comparison
+        diff_loss = round(m2["packet_loss_percent"] - m1["packet_loss_percent"], 2)
+        if diff_loss > 0.1:
+            notes.append(f"Packet loss increased from {m1['packet_loss_percent']:.2f}% to {m2['packet_loss_percent']:.2f}% (+{diff_loss:.2f}%) under higher traffic pressure.")
+        elif diff_loss < -0.1:
+            notes.append(f"Packet loss decreased from {m1['packet_loss_percent']:.2f}% to {m2['packet_loss_percent']:.2f}% ({diff_loss:.2f}%).")
+
+        # Average Delay comparison
+        diff_delay = round(m2["average_delay_ms"] - m1["average_delay_ms"], 2)
+        if diff_delay > 0.5:
+            notes.append(f"Average delay increased from {m1['average_delay_ms']:.2f} ms to {m2['average_delay_ms']:.2f} ms (+{diff_delay:.2f} ms) due to buffer queueing latency.")
+        elif diff_delay < -0.5:
+            notes.append(f"Average delay decreased from {m1['average_delay_ms']:.2f} ms to {m2['average_delay_ms']:.2f} ms ({diff_delay:.2f} ms).")
+
+        # Packet Delivery Ratio (PDR) comparison
+        diff_pdr = round(m2["pdr_percent"] - m1["pdr_percent"], 2)
+        if diff_pdr < -0.1:
+            notes.append(f"Packet delivery ratio decreased from {m1['pdr_percent']:.2f}% to {m2['pdr_percent']:.2f}% ({diff_pdr:.2f}%), indicating reduced delivery reliability.")
+        elif diff_pdr > 0.1:
+            notes.append(f"Packet delivery ratio improved from {m1['pdr_percent']:.2f}% to {m2['pdr_percent']:.2f}% (+{diff_pdr:.2f}%).")
+
+        # Protocol comparison
+        if m1["protocol"] != m2["protocol"]:
+            notes.append(f"Protocol comparison ({m1['protocol']} vs {m2['protocol']}): {m1['protocol']} achieved {m1['pdr_percent']:.1f}% PDR with {m1['packet_loss_percent']:.1f}% loss, while {m2['protocol']} achieved {m2['pdr_percent']:.1f}% PDR with {m2['packet_loss_percent']:.1f}% loss.")
+
+        # Traffic shaping (Leaky Bucket) observation
+        types_str = f"{formatted_exps[0].experiment_type} {formatted_exps[1].experiment_type}".lower()
+        if "leaky bucket" in types_str or "shaping" in types_str:
+            notes.append("Traffic shaping with Leaky Bucket regulated the measured output rate to the bucket leak rate, mitigating bottleneck overflow.")
+
+    else:
+        # Multi-experiment observations
+        tcp_runs = [m for m in metrics_table if m["protocol"] == "TCP"]
+        udp_runs = [m for m in metrics_table if m["protocol"] == "UDP"]
+        
+        if tcp_runs and udp_runs:
+            avg_tcp_pdr = sum(m["pdr_percent"] for m in tcp_runs) / len(tcp_runs)
+            avg_udp_pdr = sum(m["pdr_percent"] for m in udp_runs) / len(udp_runs)
+            notes.append(f"TCP maintained higher reliability ({avg_tcp_pdr:.1f}% PDR) compared to UDP ({avg_udp_pdr:.1f}% PDR) due to retransmission.")
+        
+        high_user_runs = [m for m in metrics_table if m["users"] >= 50]
+        low_user_runs = [m for m in metrics_table if m["users"] < 50]
+        if high_user_runs and low_user_runs:
+            avg_high_loss = sum(m["packet_loss_percent"] for m in high_user_runs) / len(high_user_runs)
+            avg_low_loss = sum(m["packet_loss_percent"] for m in low_user_runs) / len(low_user_runs)
+            notes.append(f"Heavy student concurrency (>=50 users) increased queue drops from {avg_low_loss:.1f}% to {avg_high_loss:.1f}%.")
 
     summary_text = " ".join(notes) if notes else "Comparative analysis illustrates throughput vs loss trade-offs across configurations."
 

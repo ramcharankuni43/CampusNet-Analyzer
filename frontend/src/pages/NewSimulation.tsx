@@ -23,6 +23,7 @@ export const NewSimulation: React.FC = () => {
     traffic_level: 'Medium',
     protocol: 'TCP',
     data_rate: '1 Mbps',
+    delay: '20ms',
     simulation_time: 60,
     experiment_type: 'Normal Traffic',
     packet_size: 1024,
@@ -87,6 +88,11 @@ export const NewSimulation: React.FC = () => {
     // 2. Data rate is valid
     if (!formData.data_rate || !formData.data_rate.trim()) {
       errs.data_rate = true;
+    }
+
+    // 2b. Link delay is valid
+    if (!formData.delay || !formData.delay.trim()) {
+      errs.delay = true;
     }
 
     // 3. Duration > 0
@@ -358,10 +364,10 @@ export const NewSimulation: React.FC = () => {
             </div>
           </div>
 
-          {/* Traffic Level & Experiment Type */}
+          {/* Traffic Level, Delay & Duration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Traffic Level</label>
+              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Traffic Intensity</label>
               <select
                 value={formData.traffic_level}
                 onChange={(e) => handleTrafficPreset(e.target.value as any)}
@@ -372,24 +378,30 @@ export const NewSimulation: React.FC = () => {
                 <option value="High">HIGH Preset (150 Students, 2 Mbps)</option>
                 <option value="Custom">Custom (Manual Student & Rate Config)</option>
               </select>
+              <p className="text-[11px] text-slate-400 mt-1">Preset configuration profile</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Experiment Type <span className="text-rose-500">*</span></label>
+              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+                Link Delay <span className="text-rose-500">*</span>
+              </label>
               <select
-                value={formData.experiment_type}
-                onChange={(e) => setFormData({ ...formData, experiment_type: e.target.value })}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
-                  validationErrors.experiment_type ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                value={formData.delay || '20ms'}
+                onChange={(e) => {
+                  setFormData({ ...formData, delay: e.target.value });
+                  if (validationErrors.delay) setValidationErrors({ ...validationErrors, delay: false });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono ${
+                  validationErrors.delay ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
                 }`}
               >
-                <option value="Normal Traffic">Normal Traffic (Standard E-Learning)</option>
-                <option value="High Traffic">High Traffic (Peak Lecture Load)</option>
-                <option value="TCP vs UDP">TCP vs UDP Protocol Benchmark</option>
-                <option value="Leaky Bucket">Leaky Bucket / RED Congestion Control</option>
-                <option value="Sliding Window">Sliding Window Reliability Analysis</option>
-                <option value="Go-Back-N">Go-Back-N Retransmission</option>
+                <option value="5ms">5ms (Campus LAN / Low Latency)</option>
+                <option value="10ms">10ms (Metro Network)</option>
+                <option value="20ms">20ms (Standard E-Learning Link)</option>
+                <option value="50ms">50ms (Intercity WAN)</option>
+                <option value="100ms">100ms (High Latency Link)</option>
               </select>
+              <p className="text-[11px] text-slate-400 mt-1">Propagation delay between R1 and R2</p>
             </div>
 
             <div>
@@ -405,8 +417,30 @@ export const NewSimulation: React.FC = () => {
                 <option value={30}>30 Seconds (Fast check)</option>
                 <option value={60}>60 Seconds (Standard Lab)</option>
                 <option value={90}>90 Seconds (Steady State)</option>
+                <option value={120}>120 Seconds (Extended Benchmark)</option>
               </select>
+              <p className="text-[11px] text-slate-400 mt-1">Discrete-event observation interval</p>
             </div>
+          </div>
+
+          {/* Scenario Selection */}
+          <div className="pt-2">
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1">Scenario Selection (Experiment Type) <span className="text-rose-500">*</span></label>
+            <select
+              value={formData.experiment_type}
+              onChange={(e) => setFormData({ ...formData, experiment_type: e.target.value })}
+              className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium ${
+                validationErrors.experiment_type ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+              }`}
+            >
+              <option value="Normal Traffic">Normal Traffic (Standard Campus E-Learning)</option>
+              <option value="High Traffic">High Traffic (Peak Concurrency Lecture Load)</option>
+              <option value="TCP vs UDP">TCP vs UDP Protocol Benchmark</option>
+              <option value="Leaky Bucket">Leaky Bucket Traffic Shaping Evaluation</option>
+              <option value="Sliding Window">Sliding Window Reliability Analysis</option>
+              <option value="Go-Back-N">Go-Back-N ARQ Retransmission</option>
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">Target academic study scenario</p>
           </div>
 
           {/* Packet Size & Window Size Tuning */}
@@ -457,7 +491,7 @@ export const NewSimulation: React.FC = () => {
             <div>
               <h4 className="text-xs font-bold text-[#0F172A]">Simulated NS-2 Topology Plan</h4>
               <p className="text-[11px] text-[#64748B] break-words">
-                {formData.users} Student Nodes (10Mb, 5ms) ➔ Access Router R1 ➔ [{formData.data_rate}, 20ms, {formData.experiment_type === 'Leaky Bucket' ? 'RED' : 'DropTail'}] ➔ Core Router R2 ➔ LMS Server (100Mb)
+                {formData.users} Student Nodes (10Mb, 5ms) ➔ Access Router R1 ➔ [{formData.data_rate}, {formData.delay || '20ms'}, {formData.experiment_type === 'Leaky Bucket' ? 'RED' : 'DropTail'}] ➔ Core Router R2 ➔ LMS Server (100Mb)
               </p>
             </div>
           </div>

@@ -111,6 +111,16 @@ export const Dashboard: React.FC = () => {
   const recentExps = isDemo ? DEMO_EXPERIMENTS.slice().reverse() : liveSummary?.recent_experiments || [];
   const kpis = summary?.kpis;
 
+  const completedCount = kpis?.completed_experiments !== undefined && kpis.completed_experiments > 0
+    ? kpis.completed_experiments
+    : recentExps.filter((e) => String(e.status).toLowerCase() in { completed: 1, complete: 1 }).length;
+
+  const failedCount = kpis?.failed_experiments !== undefined
+    ? kpis.failed_experiments
+    : recentExps.filter((e) => String(e.status).toLowerCase() in { failed: 1, fail: 1 }).length;
+
+  const latestExperiment = recentExps.length > 0 ? recentExps[0] : null;
+
   // Traffic Load vs Performance dataset (derived from real DB records or demo)
   const trafficLoadData = summary?.traffic_load_data && summary.traffic_load_data.length > 0
     ? summary.traffic_load_data
@@ -327,13 +337,13 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Experiments */}
+      {/* Executive Simulation Lifecycle Counters */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Simulations */}
         <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-              {isDemo ? 'Demo Runs' : 'Total Runs'}
+              Total Simulations
             </span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Layers className="w-4 h-4" />
@@ -341,71 +351,182 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-[#0F172A]">{kpis?.total_experiments ?? 0}</span>
-            <span className="text-xs text-slate-500 font-medium">experiments</span>
+            <span className="text-xs text-slate-500 font-medium">runs</span>
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1">
-            {isDemo ? 'Predefined local records' : 'Recorded in SQLite'}
+            {isDemo ? 'Predefined laboratory test cases' : 'Persisted in SQLite database'}
           </p>
         </div>
 
-        {/* Avg Throughput */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+        {/* Completed Simulations */}
+        <div className="bg-white p-5 rounded-xl border border-emerald-100 shadow-xs bg-gradient-to-br from-white to-emerald-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Throughput</span>
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+              Completed Simulations
+            </span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Zap className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_throughput_kbps ?? 0}</span>
-            <span className="text-xs text-emerald-600 font-semibold">Kbps</span>
-          </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">Average delivery rate</p>
-        </div>
-
-        {/* Avg Packet Loss */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Packet Loss</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <TrendingDown className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_packet_loss_percent ?? 0}</span>
-            <span className="text-xs text-rose-600 font-semibold">%</span>
-          </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">Bottleneck router drops</p>
-        </div>
-
-        {/* Avg Delay */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Average Delay</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_delay_ms ?? 0}</span>
-            <span className="text-xs text-amber-600 font-semibold">ms</span>
-          </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">End-to-end transmission</p>
-        </div>
-
-        {/* Packet Delivery Ratio */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">PDR</span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_pdr_percent ?? 0}</span>
-            <span className="text-xs text-indigo-600 font-semibold">%</span>
+            <span className="text-2xl font-bold text-emerald-700">{completedCount}</span>
+            <span className="text-xs text-emerald-600 font-medium">validated</span>
           </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">Packet Delivery Ratio</p>
+          <p className="text-[11px] text-emerald-600/80 mt-1">
+            Trace validated & metrics computed
+          </p>
+        </div>
+
+        {/* Failed Simulations */}
+        <div className={`p-5 rounded-xl border shadow-xs ${failedCount > 0 ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-[#E2E8F0]'}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-semibold uppercase tracking-wider ${failedCount > 0 ? 'text-rose-700' : 'text-[#64748B]'}`}>
+              Failed Simulations
+            </span>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${failedCount > 0 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
+              <AlertCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className={`text-2xl font-bold ${failedCount > 0 ? 'text-rose-700' : 'text-[#0F172A]'}`}>{failedCount}</span>
+            <span className="text-xs text-slate-500 font-medium">exceptions</span>
+          </div>
+          <p className="text-[11px] text-[#94A3B8] mt-1">
+            {failedCount > 0 ? 'Execution halted; logs stored' : 'All runs executed cleanly'}
+          </p>
+        </div>
+      </div>
+
+      {/* Latest Experiment Showcase Banner */}
+      {latestExperiment && (
+        <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-xs bg-gradient-to-r from-blue-50/40 via-white to-indigo-50/20">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 bg-blue-600 text-white font-mono font-bold text-xs rounded">
+                  Latest: {latestExperiment.exp_code}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  latestExperiment.protocol === 'TCP' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {latestExperiment.protocol}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {latestExperiment.users} Students &bull; {latestExperiment.data_rate} &bull; {latestExperiment.delay || '20ms'} delay
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  {new Date(latestExperiment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-[#0F172A]">
+                {latestExperiment.name}
+              </h3>
+              <p className="text-xs text-[#64748B] max-w-2xl truncate">
+                {latestExperiment.description || 'University network performance laboratory experiment.'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">Throughput</div>
+                  <div className="font-mono text-xs font-bold text-emerald-700">
+                    {latestExperiment.result ? `${latestExperiment.result.throughput_kbps} Kbps` : '—'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">Loss</div>
+                  <div className="font-mono text-xs font-bold text-rose-600">
+                    {latestExperiment.result ? `${latestExperiment.result.packet_loss_percent}%` : '—'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">PDR</div>
+                  <div className="font-mono text-xs font-bold text-indigo-700">
+                    {latestExperiment.result ? `${latestExperiment.result.packet_delivery_ratio}%` : '—'}
+                  </div>
+                </div>
+              </div>
+              <Link
+                to={`/experiments/${latestExperiment.id}`}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>Inspect Trace & Metrics</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Overview (Academic Telemetry Averages) */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+            Performance Overview (Aggregated Laboratory Telemetry)
+          </h3>
+          <span className="text-[11px] font-mono text-slate-400">Academic Metrics</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Avg Throughput */}
+          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Average Throughput</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Zap className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_throughput_kbps ?? 0}</span>
+              <span className="text-xs text-emerald-600 font-semibold">Kbps</span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Average delivered bandwidth</p>
+          </div>
+
+          {/* Avg Packet Loss */}
+          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Average Packet Loss</span>
+              <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_packet_loss_percent ?? 0}</span>
+              <span className="text-xs text-rose-600 font-semibold">%</span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Bottleneck router queue drops</p>
+          </div>
+
+          {/* Avg Delay */}
+          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Average End-to-End Delay</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_delay_ms ?? 0}</span>
+              <span className="text-xs text-amber-600 font-semibold">ms</span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Queueing & transmission latency</p>
+          </div>
+
+          {/* Packet Delivery Ratio */}
+          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Packet Delivery Ratio (PDR)</span>
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[#0F172A]">{kpis?.avg_pdr_percent ?? 0}</span>
+              <span className="text-xs text-indigo-600 font-semibold">%</span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Overall delivery reliability index</p>
+          </div>
         </div>
       </div>
 

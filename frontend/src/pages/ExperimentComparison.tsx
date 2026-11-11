@@ -4,13 +4,17 @@ import {
   GitCompare,
   CheckCircle2,
   TrendingDown,
+  TrendingUp,
   Clock,
   Zap,
   RefreshCw,
   AlertCircle,
   HelpCircle,
   Play,
-  Layers
+  Layers,
+  ArrowUpRight,
+  ArrowDownRight,
+  Sparkles
 } from 'lucide-react';
 import {
   BarChart,
@@ -28,8 +32,157 @@ import {
   Radar
 } from 'recharts';
 import { useDataService } from '../services/dataService';
-import { Experiment, ComparisonResponse } from '../types';
+import { Experiment, ComparisonResponse, ComparisonMetricItem } from '../types';
 import { ModeBadge, useSimulationMode } from '../context/SimulationModeContext';
+
+interface RuleObservation {
+  id: string;
+  category: 'throughput' | 'loss' | 'delay' | 'pdr' | 'protocol' | 'shaping' | 'concurrency';
+  title: string;
+  observation: string;
+  badge: string;
+  badgeColor: string;
+}
+
+function generateRuleBasedObservations(
+  m1: ComparisonMetricItem,
+  m2: ComparisonMetricItem,
+  exp1?: Experiment,
+  exp2?: Experiment
+): RuleObservation[] {
+  const list: RuleObservation[] = [];
+
+  // 1. Workload / Student Concurrency Observation
+  if (m2.users !== m1.users) {
+    const diffU = m2.users - m1.users;
+    list.push({
+      id: 'concurrency',
+      category: 'concurrency',
+      title: 'Student Workload Scaling',
+      observation: `Student concurrency ${diffU > 0 ? 'increased' : 'decreased'} from ${m1.users} to ${m2.users} active nodes (${diffU > 0 ? `+${diffU}` : diffU} nodes). Concurrency directly influences aggregate packet arrival frequency at intermediate routers.`,
+      badge: `${diffU > 0 ? `+${diffU}` : diffU} Users`,
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200'
+    });
+  }
+
+  // 2. Throughput Observation
+  if (m1.throughput_kbps > 0 && m2.throughput_kbps > 0) {
+    const diffTp = Number((m2.throughput_kbps - m1.throughput_kbps).toFixed(2));
+    const pctTp = Number(((diffTp / m1.throughput_kbps) * 100).toFixed(1));
+    if (diffTp < -0.1) {
+      list.push({
+        id: 'tp_dec',
+        category: 'throughput',
+        title: 'Throughput Decreased',
+        observation: `Throughput decreased compared with the baseline experiment by ${Math.abs(diffTp)} Kbps (${pctTp}%), dropping from ${m1.throughput_kbps} Kbps to ${m2.throughput_kbps} Kbps. Repeated packet drops triggered TCP congestion window reductions (multiplicative decrease).`,
+        badge: `${diffTp} Kbps`,
+        badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
+      });
+    } else if (diffTp > 0.1) {
+      list.push({
+        id: 'tp_inc',
+        category: 'throughput',
+        title: 'Throughput Increased',
+        observation: `Throughput increased by ${diffTp} Kbps (+${pctTp}%), rising from ${m1.throughput_kbps} Kbps to ${m2.throughput_kbps} Kbps, indicating higher link utilization under available capacity.`,
+        badge: `+${diffTp} Kbps`,
+        badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      });
+    }
+  }
+
+  // 3. Packet Loss Observation
+  const diffLoss = Number((m2.packet_loss_percent - m1.packet_loss_percent).toFixed(2));
+  if (diffLoss > 0.1) {
+    list.push({
+      id: 'loss_inc',
+      category: 'loss',
+      title: 'Packet Loss Increased Under Higher Traffic',
+      observation: `Packet loss increased from ${m1.packet_loss_percent}% to ${m2.packet_loss_percent}% (+${diffLoss}% points). Intermediate router queue buffers filled beyond capacity, causing Tail-Drop buffer discards.`,
+      badge: `+${diffLoss}% Loss`,
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200'
+    });
+  } else if (diffLoss < -0.1) {
+    list.push({
+      id: 'loss_dec',
+      category: 'loss',
+      title: 'Packet Loss Decreased',
+      observation: `Packet loss decreased from ${m1.packet_loss_percent}% to ${m2.packet_loss_percent}% (${diffLoss}% points), reflecting reduced buffer saturation and fewer link discards.`,
+      badge: `${diffLoss}% Loss`,
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    });
+  }
+
+  // 4. Average Delay Observation
+  const diffDelay = Number((m2.average_delay_ms - m1.average_delay_ms).toFixed(2));
+  if (diffDelay > 0.5) {
+    list.push({
+      id: 'delay_inc',
+      category: 'delay',
+      title: 'Average Delay Increased',
+      observation: `Average end-to-end delay increased from ${m1.average_delay_ms} ms to ${m2.average_delay_ms} ms (+${diffDelay} ms). Packets experienced extended queueing latency in intermediate router buffers before link transmission.`,
+      badge: `+${diffDelay} ms`,
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
+    });
+  } else if (diffDelay < -0.5) {
+    list.push({
+      id: 'delay_dec',
+      category: 'delay',
+      title: 'Average Delay Decreased',
+      observation: `Average delay decreased from ${m1.average_delay_ms} ms to ${m2.average_delay_ms} ms (${diffDelay} ms), indicating shorter intermediate queue residency.`,
+      badge: `${diffDelay} ms`,
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    });
+  }
+
+  // 5. Packet Delivery Ratio Observation
+  const diffPdr = Number((m2.pdr_percent - m1.pdr_percent).toFixed(2));
+  if (diffPdr < -0.1) {
+    list.push({
+      id: 'pdr_dec',
+      category: 'pdr',
+      title: 'Packet Delivery Ratio Decreased',
+      observation: `Packet delivery ratio decreased from ${m1.pdr_percent}% to ${m2.pdr_percent}% (${diffPdr}% points), indicating reduced delivery reliability due to congestion drops.`,
+      badge: `${diffPdr}% PDR`,
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200'
+    });
+  } else if (diffPdr > 0.1) {
+    list.push({
+      id: 'pdr_inc',
+      category: 'pdr',
+      title: 'Packet Delivery Ratio Improved',
+      observation: `Packet delivery ratio improved from ${m1.pdr_percent}% to ${m2.pdr_percent}% (+${diffPdr}% points), demonstrating higher delivery reliability.`,
+      badge: `+${diffPdr}% PDR`,
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    });
+  }
+
+  // 6. Protocol Observation (TCP vs UDP)
+  if (m1.protocol !== m2.protocol) {
+    list.push({
+      id: 'protocol',
+      category: 'protocol',
+      title: 'TCP vs UDP Transport Behavior',
+      observation: `Comparing ${m1.protocol} against ${m2.protocol}: TCP throttles transmission window size upon detecting dropped packets to avoid congestion collapse, whereas UDP sends at an unconstrained constant rate without retransmission.`,
+      badge: `${m1.protocol} vs ${m2.protocol}`,
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200'
+    });
+  }
+
+  // 7. Traffic Shaping Observation (Leaky Bucket)
+  const typesText = `${exp1?.experiment_type || ''} ${exp2?.experiment_type || ''}`.toLowerCase();
+  if (typesText.includes('leaky bucket') || typesText.includes('shaping')) {
+    list.push({
+      id: 'shaping',
+      category: 'shaping',
+      title: 'Traffic Shaping (Leaky Bucket Control)',
+      observation: 'Traffic shaping reduced the measured peak output rate to the configured leak rate, bounding queue overflow and smoothing bursty packet delivery.',
+      badge: 'Leaky Bucket',
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    });
+  }
+
+  return list;
+}
 
 export const ExperimentComparison: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -155,6 +308,13 @@ export const ExperimentComparison: React.FC = () => {
   });
 
   const radarColors = ['#2563EB', '#F59E0B', '#10B981', '#8B5CF6'];
+
+  const isTwoExps = comparison !== null && comparison.metrics_table.length === 2;
+  const m1 = isTwoExps ? comparison.metrics_table[0] : null;
+  const m2 = isTwoExps ? comparison.metrics_table[1] : null;
+  const exp1 = isTwoExps ? comparison.experiments.find((e) => e.id === m1?.id) : undefined;
+  const exp2 = isTwoExps ? comparison.experiments.find((e) => e.id === m2?.id) : undefined;
+  const observations = m1 && m2 ? generateRuleBasedObservations(m1, m2, exp1, exp2) : [];
 
   return (
     <div className="space-y-6">
@@ -352,6 +512,164 @@ export const ExperimentComparison: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Direct Head-to-Head Difference Analysis (When 2 Experiments are Selected) */}
+          {isTwoExps && m1 && m2 && (
+            <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F1F5F9] pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
+                    <span>Direct Head-to-Head Difference Analysis</span>
+                    <span className="text-xs font-mono font-normal text-slate-500">
+                      ({m1.exp_code} &rarr; {m2.exp_code})
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[#64748B]">
+                    Calculated variance across the four primary performance metrics
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                  Exact Metric Variance
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Delta Throughput */}
+                {(() => {
+                  const diff = Number((m2.throughput_kbps - m1.throughput_kbps).toFixed(2));
+                  const isPositive = diff > 0;
+                  const pct = m1.throughput_kbps > 0 ? Number(((diff / m1.throughput_kbps) * 100).toFixed(1)) : 0;
+                  return (
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>Throughput</span>
+                        <Zap className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-xl font-bold font-mono ${isPositive ? 'text-emerald-700' : diff < 0 ? 'text-amber-700' : 'text-slate-800'}`}>
+                          {diff > 0 ? `+${diff}` : diff} Kbps
+                        </span>
+                        <span className={`text-xs font-semibold ${isPositive ? 'text-emerald-600' : 'text-slate-500'}`}>
+                          ({isPositive ? `+${pct}%` : `${pct}%`})
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {m1.throughput_kbps} &rarr; {m2.throughput_kbps} Kbps
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Delta Packet Loss */}
+                {(() => {
+                  const diff = Number((m2.packet_loss_percent - m1.packet_loss_percent).toFixed(2));
+                  const isIncreased = diff > 0;
+                  return (
+                    <div className={`p-4 rounded-xl border space-y-1 ${isIncreased ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200 bg-slate-50'}`}>
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>Packet Loss</span>
+                        <TrendingDown className={`w-4 h-4 ${isIncreased ? 'text-rose-600' : 'text-emerald-600'}`} />
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-xl font-bold font-mono ${isIncreased ? 'text-rose-700' : diff < 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
+                          {diff > 0 ? `+${diff}` : diff}%
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">variance</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {m1.packet_loss_percent}% &rarr; {m2.packet_loss_percent}%
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 3. Delta Average Delay */}
+                {(() => {
+                  const diff = Number((m2.average_delay_ms - m1.average_delay_ms).toFixed(2));
+                  const isIncreased = diff > 0;
+                  return (
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>Average Latency</span>
+                        <Clock className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-xl font-bold font-mono ${isIncreased ? 'text-amber-700' : diff < 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
+                          {diff > 0 ? `+${diff}` : diff} ms
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">latency</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {m1.average_delay_ms} ms &rarr; {m2.average_delay_ms} ms
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. Delta PDR */}
+                {(() => {
+                  const diff = Number((m2.pdr_percent - m1.pdr_percent).toFixed(2));
+                  const isImproved = diff > 0;
+                  return (
+                    <div className={`p-4 rounded-xl border space-y-1 ${diff < 0 ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200 bg-slate-50'}`}>
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>Delivery Ratio (PDR)</span>
+                        <CheckCircle2 className={`w-4 h-4 ${isImproved ? 'text-emerald-600' : 'text-amber-600'}`} />
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-xl font-bold font-mono ${isImproved ? 'text-emerald-700' : diff < 0 ? 'text-amber-700' : 'text-slate-800'}`}>
+                          {diff > 0 ? `+${diff}` : diff}%
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">reliability</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {m1.pdr_percent}% &rarr; {m2.pdr_percent}%
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Automatic Rule-Based Result Interpretation (Phase 7) */}
+          {observations.length > 0 && (
+            <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-xs space-y-3 bg-gradient-to-br from-white to-blue-50/20">
+              <div className="flex items-center gap-2 border-b border-[#F1F5F9] pb-3">
+                <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-bold text-[#0F172A]">
+                    Automated Academic Analysis & Observations (Rule-Based Engine)
+                  </h3>
+                  <p className="text-xs text-[#64748B]">
+                    Calculated networking observations derived strictly from measured simulation data
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                {observations.map((obs) => (
+                  <div
+                    key={obs.id}
+                    className="p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors space-y-1 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        <h4 className="text-xs font-bold text-[#0F172A]">{obs.title}</h4>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${obs.badgeColor}`}>
+                        {obs.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#475569] leading-relaxed pl-4">
+                      {obs.observation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Comparative Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

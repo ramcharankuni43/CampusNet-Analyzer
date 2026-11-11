@@ -28,6 +28,8 @@ import {
   Line,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -40,16 +42,21 @@ import {
 } from 'recharts';
 import { experimentService } from '../services/experimentService';
 import { api } from '../services/api';
-import { Experiment } from '../types';
+import { Experiment, DashboardSummary } from '../types';
 import { ModeBadge, useSimulationMode } from '../context/SimulationModeContext';
 
 export const ExperimentResults: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { mode, isDemo, setMode } = useSimulationMode();
   const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [summaryData, setSummaryData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getDashboardSummary(mode).then(setSummaryData).catch(() => null);
+  }, [mode]);
 
   const loadExperiment = () => {
     if (!id) return;
@@ -423,6 +430,122 @@ export const ExperimentResults: React.FC = () => {
                   <Line type="monotone" dataKey="delay_ms" name="Delay (ms)" stroke="#F59E0B" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Scenario Academic Benchmarks (Actual Backend Telemetry) */}
+      {summaryData && (
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F1F5F9] pb-3 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-[#0F172A]">
+                  Cross-Scenario Academic Benchmarks (Actual Backend Telemetry)
+                </h3>
+                <p className="text-xs text-[#64748B]">
+                  Contextual comparison against university workload tiers and transport protocols
+                </p>
+              </div>
+              <span className="text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                Database Telemetry Source
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chart A: Throughput vs Student Scaling */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Throughput Comparison Across Concurrency (Kbps)
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-mono">TCP vs UDP</span>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={summaryData.throughput_vs_users}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                      <XAxis dataKey="users" unit="u" fontSize={11} stroke="#94A3B8" />
+                      <YAxis fontSize={11} stroke="#94A3B8" unit="k" />
+                      <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="tcp" name="TCP Throughput (Kbps)" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="udp" name="UDP Throughput (Kbps)" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart B: Packet Loss Comparison */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Packet Loss Rate Comparison (%)
+                  </h4>
+                  <span className="text-[10px] text-rose-500 font-mono">Bottleneck Drops</span>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={summaryData.loss_vs_users}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                      <XAxis dataKey="users" unit="u" fontSize={11} stroke="#94A3B8" />
+                      <YAxis fontSize={11} stroke="#94A3B8" unit="%" />
+                      <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="tcp" name="TCP Loss %" fill="#DC2626" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="udp" name="UDP Loss %" fill="#9333EA" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart C: Average Delay Comparison */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Average Latency Comparison (ms)
+                  </h4>
+                  <span className="text-[10px] text-amber-500 font-mono">Queueing Delay</span>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={summaryData.delay_vs_users}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                      <XAxis dataKey="users" unit="u" fontSize={11} stroke="#94A3B8" />
+                      <YAxis fontSize={11} stroke="#94A3B8" unit="ms" />
+                      <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="tcp" name="TCP Delay (ms)" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="udp" name="UDP Delay (ms)" fill="#F97316" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart D: Workload Tier Analysis (Low, Med, High) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Workload Tier Analysis (Low, Med, High)
+                  </h4>
+                  <span className="text-[10px] text-emerald-600 font-mono">Campus Workload</span>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={summaryData.traffic_load_data || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                      <XAxis dataKey="load" fontSize={10} stroke="#94A3B8" tickFormatter={(v) => v.split(' ')[0]} />
+                      <YAxis fontSize={11} stroke="#94A3B8" />
+                      <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="throughput" name="Throughput (Kbps)" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="loss" name="Loss %" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="delay" name="Delay (ms)" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         </div>

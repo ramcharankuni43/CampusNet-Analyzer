@@ -29,13 +29,22 @@ export interface Experiment {
   protocol: 'TCP' | 'UDP';
   traffic_level: 'Low' | 'Medium' | 'High' | 'Custom';
   data_rate: string;
+  delay?: string;
   simulation_time: number;
   experiment_type: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'pending' | 'running' | 'completed' | 'failed';
   is_demo: boolean;
   trace_file?: string;
+  output_dir?: string;
+  error_message?: string;
   created_at: string;
   result?: Result;
+
+  // Flattened top-level metrics
+  throughput_kbps?: number;
+  packet_loss_percent?: number;
+  packet_delivery_ratio?: number;
+  average_delay_ms?: number;
 }
 
 export interface SimulationConfig {
@@ -45,6 +54,7 @@ export interface SimulationConfig {
   protocol: 'TCP' | 'UDP';
   traffic_level: 'Low' | 'Medium' | 'High' | 'Custom';
   data_rate: string;
+  delay?: string;
   simulation_time: number;
   experiment_type: string;
   packet_size?: number;
@@ -54,6 +64,8 @@ export interface SimulationConfig {
 
 export interface DashboardKPIs {
   total_experiments: number;
+  completed_experiments?: number;
+  failed_experiments?: number;
   avg_throughput_kbps: number;
   avg_packet_loss_percent: number;
   avg_delay_ms: number;
@@ -170,6 +182,7 @@ export interface SimulationStatusResponse {
   stage_message: string;
   logs: string[];
   error?: string | null;
+  error_message?: string | null;
   result?: Result | null;
 }
 
