@@ -188,3 +188,89 @@ def test_unique_exp_code_generation():
 
     assert code1 != code2
 
+def test_parse_ns2_exact_formulas(tmp_path):
+    # Tests exact math according to Phase 3 requirements:
+    # Throughput = (Received Bytes * 8) / (Observation Duration * 1000)
+    # Lost Packets = Sent Packets - Received Packets
+    # Packet Loss % = (Lost Packets / Sent Packets) * 100
+    # PDR = (Received Packets / Sent Packets) * 100
+    # Average Delay = Total delivery delay / Successfully received packets
+    # Retransmitted packets NOT counted as unique original packets for PDR
+
+    trace_file = tmp_path / "test_trace.tr"
+    lines = []
+    # 10 packets sent from node 0 (0.0) to server 3 (3.0), duration = 10.0s
+    for i in range(1, 11):
+        lines.append(f"+ 0.{i:02d}0000 0 1 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+        lines.append(f"- 0.{i:02d}1000 0 1 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+        lines.append(f"r 0.{i:02d}5000 0 1 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+
+        if i == 2:
+            # Packet 2 drops on link 1->2
+            lines.append(f"d 0.{i:02d}7000 1 2 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+            # Packet 2 retransmitted as pkt_id 20 with same seq_num 2 at t=0.500
+            lines.append(f"+ 0.500000 0 1 tcp 1024 ------- 1 0.0 3.0 2 20")
+            lines.append(f"- 0.501000 0 1 tcp 1024 ------- 1 0.0 3.0 2 20")
+            lines.append(f"r 0.505000 0 1 tcp 1024 ------- 1 0.0 3.0 2 20")
+            lines.append(f"- 0.510000 1 2 tcp 1024 ------- 1 0.0 3.0 2 20")
+            lines.append(f"r 0.530000 1 2 tcp 1024 ------- 1 0.0 3.0 2 20")
+            lines.append(f"r 0.532000 2 3 tcp 1024 ------- 1 0.0 3.0 2 20")
+        elif i == 5:
+            # Packet 5 drops on link 1->2 and is NEVER retransmitted (lost packet)
+            lines.append(f"d 0.{i:02d}7000 1 2 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+        else:
+            # Successfully delivered
+            lines.append(f"- 0.{i:02d}6000 1 2 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+            lines.append(f"r 0.{i:02d}8000 1 2 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+            lines.append(f"r 0.{i:02d}8200 2 3 tcp 1024 ------- 1 0.0 3.0 {i} {i}")
+
+    # Add reverse ACKs to verify flow filtering ignores ACKs
+    lines.append("+ 0.150000 3 2 ack 40 ------- 1 3.0 0.0 1 30")
+    lines.append("r 0.170000 1 0 ack 40 ------- 1 3.0 0.0 1 30")
+
+    trace_file.write_text("\n".join(lines), encoding="utf-8")
+
+    duration = 10.0
+    res = parse_ns2_trace_file(str(trace_file), server_node_id=3, simulation_duration=duration)
+
+    assert res["packets_sent"] == 10  # 10 unique original packets
+    assert res["packets_received"] == 9  # 9 unique delivered (packet 5 lost, packet 2 delivered via retransmission)
+    assert res["lost_packets"] == 1  # 10 - 9 = 1 lost packet
+    assert res["packet_delivery_ratio"] == 90.0  # (9 / 10) * 100
+    assert res["packet_loss_percent"] == 10.0  # (1 / 10) * 100
+    assert res["packets_dropped"] == 2  # 2 drop events (packet 2 and packet 5)
+
+    # Received bytes = 9 delivered * 1024 = 9216 bytes
+    # Expected throughput = (9216 * 8) / (10.0 * 1000) = 73.728 -> 73.73 Kbps
+    expected_tp = round((9 * 1024 * 8.0) / (duration * 1000.0), 2)
+    assert res["throughput_kbps"] == expected_tp
+    assert res["average_delay_ms"] > 0
+
+def test_parse_ns2_zero_packets_and_malformed_lines(tmp_path):
+    empty_trace = tmp_path / "empty.tr"
+    empty_trace.write_text("", encoding="utf-8")
+    res_empty = parse_ns2_trace_file(str(empty_trace), server_node_id=12, simulation_duration=60.0)
+    assert res_empty["throughput_kbps"] == 0.0
+    assert res_empty["packet_loss_percent"] == 0.0
+    assert res_empty["packet_delivery_ratio"] == 0.0
+    assert res_empty["average_delay_ms"] == 0.0
+    assert res_empty["packets_sent"] == 0
+    assert res_empty["packets_received"] == 0
+
+    malformed_trace = tmp_path / "malformed.tr"
+    malformed_trace.write_text("random garbage\n+ 0.1\n+ invalid float 0 1\n", encoding="utf-8")
+    res_malformed = parse_ns2_trace_file(str(malformed_trace), server_node_id=12, simulation_duration=60.0)
+    assert res_malformed["packets_sent"] == 0
+    assert res_malformed["throughput_kbps"] == 0.0
+
+def test_parse_ns2_cross_check_experiment_1():
+    trace_path = "simulation/traces/experiment_1.tr"
+    if os.path.exists(trace_path):
+        res = parse_ns2_trace_file(trace_path, server_node_id=12, simulation_duration=60.0)
+        assert res["packets_sent"] > 0
+        assert res["packets_received"] == res["packets_sent"]
+        assert res["packet_delivery_ratio"] == 100.0
+        assert res["packet_loss_percent"] == 0.0
+        assert res["throughput_kbps"] > 0
+        assert res["average_delay_ms"] > 0
+
