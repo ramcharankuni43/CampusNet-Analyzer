@@ -308,6 +308,7 @@ def generate_tcl_script(
             f"$ns queue-limit $r1 $shaper 20",
             f"# Regulated Outflow: Constant leak rate draining into Core Router R2",
             f"$ns duplex-link $shaper $r2 {eff_bw} {eff_delay} DropTail",
+            f"$ns queue-limit $shaper $r2 20",
             f"# Backbone link to Server",
             f"$ns duplex-link $r2 $server 100Mb 2ms DropTail",
         ])
@@ -406,7 +407,8 @@ def generate_calibrated_demo_trace(
     data_rate_str: str,
     sim_duration: float,
     experiment_type: str,
-    delay: str = "20ms"
+    delay: str = "20ms",
+    bucket_size: Optional[int] = None
 ):
     """
     Generates a physically calibrated, realistic NS-2 trace file (.tr) 
@@ -436,7 +438,12 @@ def generate_calibrated_demo_trace(
     seq_num = 0
     current_time = 0.1
 
-    queue_capacity = 25 if experiment_type != "Leaky Bucket" else 35
+    if experiment_type == "Leaky Bucket":
+        queue_capacity = bucket_size if bucket_size is not None else 35
+    elif "unshaped" in trace_path.lower():
+        queue_capacity = 10
+    else:
+        queue_capacity = bucket_size if bucket_size is not None else 25
     current_queue = 0
     next_departure_time = 0.1
 
@@ -1063,7 +1070,7 @@ async def run_gbn_simulation(
         await execute_ns2_command_async(tcl_path, sim_time, run_dir=run_dir)
         parsed = parse_gbn_sequence_trace(tr_path, sender_node_id=0, dest_node_id=3)
         summary = (
-            f"NS-2 Go-Back-N run (Tahoe) with window size N={window_size} and {int(loss_rate * 100)}% link loss: "
+            f"NS-2 Go-Back-N (Tahoe Approximation) with window size N={window_size} and {int(loss_rate * 100)}% link loss: "
             f"{parsed['packets_sent']} packets sent, {parsed['retransmissions']} retransmissions after timeout, "
             f"{parsed['packets_dropped']} drops, and {parsed['packets_received']} successfully acknowledged."
         )
@@ -1072,7 +1079,7 @@ async def run_gbn_simulation(
         tr_path = os.path.join(run_dir, "trace.tr")
         parsed = generate_calibrated_gbn_demo_trace(tr_path, window_size, loss_rate, sim_time)
         summary = (
-            f"[DEMO MODE] Calibrated Go-Back-N simulation benchmark: window size N={window_size}, "
+            f"[DEMO MODE] Calibrated Go-Back-N (Tahoe Approximation): window size N={window_size}, "
             f"{int(loss_rate * 100)}% link loss, {parsed['packets_sent']} packets sent, "
             f"{parsed['retransmissions']} retransmissions, {parsed['packets_dropped']} drops."
         )
@@ -1134,6 +1141,7 @@ def generate_leaky_bucket_tcl_scripts(
         f"$ns duplex-link $r1 $shaper 10Mb 1ms DropTail",
         f"$ns queue-limit $r1 $shaper {bucket_size}",
         f"$ns duplex-link $shaper $r2 {clean_leak} 20ms DropTail",
+        f"$ns queue-limit $shaper $r2 {bucket_size}",
         "$ns duplex-link $r2 $srv 100Mb 2ms DropTail",
         "",
         "set udp [new Agent/UDP]",
@@ -1228,7 +1236,8 @@ def generate_calibrated_leaky_bucket_demo_trace(
         protocol="UDP",
         data_rate_str="2 Mbps",
         sim_duration=sim_time,
-        experiment_type="Normal Traffic"
+        experiment_type="Normal Traffic",
+        bucket_size=10
     )
     generate_calibrated_demo_trace(
         shaped_tr_path,
@@ -1236,7 +1245,8 @@ def generate_calibrated_leaky_bucket_demo_trace(
         protocol="UDP",
         data_rate_str=leak_rate,
         sim_duration=sim_time,
-        experiment_type="Leaky Bucket"
+        experiment_type="Leaky Bucket",
+        bucket_size=bucket_size
     )
     return parse_leaky_bucket_comparison(
         unshaped_tr_path,
@@ -1272,7 +1282,7 @@ async def run_leaky_bucket_simulation(
         )
         await execute_ns2_command_async(sh_tcl, sim_time, run_dir=run_dir)
         await execute_ns2_command_async(un_tcl, sim_time, run_dir=run_dir)
-        parsed = parse_leaky_bucket_comparison(un_tr, sh_tr, server_node_id=4, simulation_duration=sim_time)
+        parsed = parse_leaky_bucket_comparison(un_tr, sh_tr, server_node_id=None, simulation_duration=sim_time)
         summary = (
             f"NS-2 Leaky Bucket Comparison: Unshaped bursts produced {parsed['unshaped_loss_percent']}% packet loss. "
             f"Leaky Bucket shaping (Bucket Size: {bucket_size}, Leak Rate: {leak_rate}) "

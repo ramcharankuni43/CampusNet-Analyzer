@@ -301,14 +301,18 @@ export const GoBackN: React.FC = () => {
         )}
 
         {/* Viva Mapping Explanation Box */}
-        <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200 text-xs text-blue-950 space-y-1.5 leading-relaxed">
+        <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200 text-xs text-blue-950 space-y-2 leading-relaxed">
           <div className="flex items-center gap-2 font-bold text-blue-900">
             <Info className="w-4 h-4 text-blue-600" />
-            <span>Viva Defense: How Go-Back-N is Modeled in NS-2</span>
+            <span>Academic Note: Go-Back-N Modeling & Tahoe Approximation in NS-2</span>
           </div>
           <p>
-            NS-2 lacks a native <code>Agent/GBN</code> object. Academically and practically, Go-Back-N is simulated using <strong>Agent/TCP (Tahoe)</strong> paired with cumulative <strong>Agent/TCPSink</strong>. When a packet drops via the bottleneck <code>ErrorModel</code>, the receiver refuses out-of-order segments and continues generating duplicate ACKs for the missing frame. Upon RTO timeout, Tahoe collapses <code>cwnd</code> to 1 and retransmits starting from the lost sequence number forward, precisely executing Go-Back-N ARQ semantics.
+            NS-2 does not include a standalone link-layer <code>Agent/GBN</code> class. In academic simulation practice, Go-Back-N sliding-window dynamics are modeled using <strong>Agent/TCP (Tahoe)</strong> paired with cumulative <strong>Agent/TCPSink</strong> with <code>window_</code> set to the ARQ window size.
           </p>
+          <div className="p-2.5 bg-white/80 rounded-lg border border-blue-200 text-[11px] space-y-1">
+            <p><strong>Shared GBN Semantics:</strong> Receiver generates cumulative ACKs acknowledging the highest in-order frame, discards out-of-order segments without buffering, and sender retransmits unacknowledged packets starting from the lost sequence upon RTO timeout.</p>
+            <p><strong>Approximation Distinction:</strong> Textbook GBN employs a static window of size <em>N</em> with immediate full-window retransmission and zero congestion control. TCP Tahoe implements GBN retransmission semantics but couples them with dynamic congestion window backoff (resetting <code>cwnd</code> to 1 followed by Slow Start).</p>
+          </div>
         </div>
       </div>
 
