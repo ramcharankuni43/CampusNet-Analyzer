@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional, Any, Dict, Union
 import datetime
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 def validate_bandwidth_string(bw_raw: str) -> str:
     """Validates and standardizes bandwidth string into e.g. '10 Mbps' or '512 Kbps'."""
@@ -69,8 +69,7 @@ class ResultResponse(ResultBase):
     experiment_id: int
     time_series: Optional[List[Dict[str, Any]]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SimulationConfigCreate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=128)
@@ -200,11 +199,17 @@ class ExperimentResponse(BaseModel):
     is_demo: bool
     trace_file: Optional[str] = None
     output_dir: Optional[str] = None
+    error_message: Optional[str] = None
     created_at: datetime.datetime
     result: Optional[ResultResponse] = None
 
-    class Config:
-        from_attributes = True
+    # Flattened top-level metrics for direct access
+    throughput_kbps: Optional[float] = None
+    packet_loss_percent: Optional[float] = None
+    packet_delivery_ratio: Optional[float] = None
+    average_delay_ms: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 class DashboardKPIs(BaseModel):
     total_experiments: int
@@ -249,6 +254,7 @@ class SimulationStatusResponse(BaseModel):
     stage_message: str
     logs: List[str]
     error: Optional[str] = None
+    error_message: Optional[str] = None
     result: Optional[ResultResponse] = None
 
 class SystemStatusResponse(BaseModel):

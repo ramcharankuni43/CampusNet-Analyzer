@@ -15,6 +15,10 @@ router = APIRouter(prefix="/experiments", tags=["Experiments"])
 
 def format_experiment_response(exp: Experiment) -> ExperimentResponse:
     res_resp = None
+    tp = None
+    loss = None
+    pdr = None
+    delay_ms = None
     if exp.result:
         ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
         res_resp = ResultResponse(
@@ -31,6 +35,11 @@ def format_experiment_response(exp: Experiment) -> ExperimentResponse:
             summary_notes=exp.result.summary_notes,
             time_series=ts
         )
+        tp = exp.result.throughput_kbps
+        loss = exp.result.packet_loss_percent
+        pdr = exp.result.packet_delivery_ratio
+        delay_ms = exp.result.average_delay_ms
+
     return ExperimentResponse(
         id=exp.id,
         exp_code=exp.exp_code,
@@ -47,8 +56,13 @@ def format_experiment_response(exp: Experiment) -> ExperimentResponse:
         is_demo=exp.is_demo,
         trace_file=exp.trace_file,
         output_dir=exp.output_dir,
+        error_message=getattr(exp, "error_message", None),
         created_at=exp.created_at,
-        result=res_resp
+        result=res_resp,
+        throughput_kbps=tp,
+        packet_loss_percent=loss,
+        packet_delivery_ratio=pdr,
+        average_delay_ms=delay_ms
     )
 
 @router.get("", response_model=List[ExperimentResponse])
@@ -160,12 +174,11 @@ def delete_experiment(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Experiment {exp.exp_code} deleted successfully", "id": id}
 
-@router.post("/compare", response_model=ComparisonResponse)
-def compare_experiments(request: ComparisonRequest, db: Session = Depends(get_db)):
-    if len(request.experiment_ids) < 2:
+def perform_comparison(experiment_ids: List[int], db: Session) -> ComparisonResponse:
+    if len(experiment_ids) < 2:
         raise HTTPException(status_code=400, detail="At least two experiments must be selected for comparison")
 
-    experiments = db.query(Experiment).filter(Experiment.id.in_(request.experiment_ids)).all()
+    experiments = db.query(Experiment).filter(Experiment.id.in_(experiment_ids)).all()
     if len(experiments) < 2:
         raise HTTPException(status_code=404, detail="One or more requested experiments were not found")
 
@@ -238,3 +251,7 @@ def compare_experiments(request: ComparisonRequest, db: Session = Depends(get_db
         },
         analysis_summary=summary_text
     )
+
+@router.post("/compare", response_model=ComparisonResponse)
+def compare_experiments(request: ComparisonRequest, db: Session = Depends(get_db)):
+    return perform_comparison(request.experiment_ids, db)

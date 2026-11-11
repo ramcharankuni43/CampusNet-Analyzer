@@ -21,6 +21,7 @@ class Experiment(Base):
     is_demo = Column(Boolean, default=False)
     trace_file = Column(String(256), nullable=True)
     output_dir = Column(String(256), nullable=True)
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     result = relationship("Result", back_populates="experiment", uselist=False, cascade="all, delete-orphan")

@@ -274,3 +274,62 @@ def test_parse_ns2_cross_check_experiment_1():
         assert res["throughput_kbps"] > 0
         assert res["average_delay_ms"] > 0
 
+def test_simulations_list_and_get_by_id():
+    # Test GET /api/simulations
+    response = client.get("/api/simulations")
+    assert response.status_code == 200
+    sims = response.json()
+    assert isinstance(sims, list)
+    assert len(sims) >= 8
+
+    # Test GET /api/simulations/{id}
+    first_id = sims[0]["id"]
+    single_resp = client.get(f"/api/simulations/{first_id}")
+    assert single_resp.status_code == 200
+    single_data = single_resp.json()
+    assert single_data["id"] == first_id
+    assert single_data["exp_code"] == sims[0]["exp_code"]
+    assert "throughput_kbps" in single_data
+    assert "packet_loss_percent" in single_data
+
+    # Test GET /api/simulations/999999 (not found)
+    nf_resp = client.get("/api/simulations/999999")
+    assert nf_resp.status_code == 404
+
+def test_simulations_compare_get_and_post():
+    response = client.get("/api/simulations")
+    sims = response.json()
+    id1, id2 = sims[0]["id"], sims[1]["id"]
+
+    # Test GET /api/simulations/compare?ids=id1,id2
+    get_comp = client.get(f"/api/simulations/compare?ids={id1},{id2}")
+    assert get_comp.status_code == 200
+    comp_data = get_comp.json()
+    assert len(comp_data["experiments"]) == 2
+    assert "metrics_table" in comp_data
+    assert "comparison_charts" in comp_data
+    assert "analysis_summary" in comp_data
+
+    # Test POST /api/simulations/compare
+    post_comp = client.post("/api/simulations/compare", json={"experiment_ids": [id1, id2]})
+    assert post_comp.status_code == 200
+    assert len(post_comp.json()["experiments"]) == 2
+
+    # Test validation: < 2 IDs
+    bad_comp = client.get(f"/api/simulations/compare?ids={id1}")
+    assert bad_comp.status_code == 400
+
+def test_simulation_results_endpoint():
+    response = client.get("/api/simulations")
+    sims = response.json()
+    completed_sim = next((s for s in sims if s.get("result") is not None), None)
+    assert completed_sim is not None, "At least one completed simulation with results should exist"
+    first_id = completed_sim["id"]
+
+    res_resp = client.get(f"/api/simulations/{first_id}/results")
+    assert res_resp.status_code == 200
+    data = res_resp.json()
+    assert data["id"] == first_id
+    assert data["result"] is not None
+    assert data["result"]["throughput_kbps"] > 0
+

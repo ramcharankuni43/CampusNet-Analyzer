@@ -53,12 +53,21 @@ def init_db():
                         conn.exec_driver_sql("ALTER TABLE experiments ADD COLUMN delay VARCHAR(32) DEFAULT '20ms'")
                     if "output_dir" not in col_names:
                         conn.exec_driver_sql("ALTER TABLE experiments ADD COLUMN output_dir VARCHAR(256)")
+                    if "error_message" not in col_names:
+                        conn.exec_driver_sql("ALTER TABLE experiments ADD COLUMN error_message TEXT")
                     conn.commit()
             except Exception:
                 pass
 
 def get_db():
-    db = SessionLocal()
+    try:
+        db = SessionLocal()
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database service unavailable: {str(e)}"
+        )
     try:
         yield db
     finally:

@@ -549,6 +549,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
                 f"[{time.strftime('%H:%M:%S')}] [ERROR] LIVE SIMULATION UNAVAILABLE: {err_msg}"
             )
             exp.status = "failed"
+            exp.error_message = err_msg
             db.commit()
             await ws_manager.broadcast_sim(experiment_id, active_simulations[experiment_id])
             return
@@ -661,6 +662,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
                 active_simulations[experiment_id]["stage_message"] = "Simulation Failed"
                 active_simulations[experiment_id]["logs"].append(f"[{time.strftime('%H:%M:%S')}] [ERROR] Exception: {str(e)}")
                 exp.status = "failed"
+                exp.error_message = err_msg
                 db.commit()
                 await ws_manager.broadcast_sim(experiment_id, active_simulations[experiment_id])
                 return
@@ -702,6 +704,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
             active_simulations[experiment_id]["stage_message"] = "Trace Processing Failed"
             active_simulations[experiment_id]["logs"].append(f"[{time.strftime('%H:%M:%S')}] [ERROR] Trace file missing or 0 bytes: {tr_path}")
             exp.status = "failed"
+            exp.error_message = err_msg
             db.commit()
             await ws_manager.broadcast_sim(experiment_id, active_simulations[experiment_id])
             return
@@ -726,6 +729,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
             active_simulations[experiment_id]["stage_message"] = "Trace Processing Failed"
             active_simulations[experiment_id]["logs"].append(f"[{time.strftime('%H:%M:%S')}] [ERROR] Parser exception: {str(e)}")
             exp.status = "failed"
+            exp.error_message = err_msg
             db.commit()
             await ws_manager.broadcast_sim(experiment_id, active_simulations[experiment_id])
             return
@@ -828,6 +832,7 @@ async def run_simulation_task(experiment_id: int, db_factory):
             exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
             if exp:
                 exp.status = "failed"
+                exp.error_message = err_msg
                 db.commit()
         except Exception:
             pass

@@ -1,17 +1,38 @@
 import os
 import sys
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from .database import engine, Base, SessionLocal, init_db
-from .models import Experiment
-from .services.seed_data import seed_database
-from .api import dashboard, experiments, simulations, reports, system
+# Ensure module can be run directly as a script or imported from workspace root or backend
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_backend_dir = os.path.dirname(_current_dir)
+_root_dir = os.path.dirname(_backend_dir)
+for _p in (_backend_dir, _root_dir, _current_dir):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+try:
+    from .database import engine, Base, SessionLocal, init_db, get_db
+    from .models import Experiment
+    from .services.seed_data import seed_database
+    from .services.simulation_service import check_ns2_installation
+    from .api import dashboard, experiments, simulations, reports, system
+except (ImportError, ValueError):
+    from app.database import engine, Base, SessionLocal, init_db, get_db
+    from app.models import Experiment
+    from app.services.seed_data import seed_database
+    from app.services.simulation_service import check_ns2_installation
+    from app.api import dashboard, experiments, simulations, reports, system
+
+logger = logging.getLogger("edunet.api")
 
 # Application lifespan for DB init and initial seeding
 @asynccontextmanager
@@ -69,11 +90,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled server exception on {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": "Internal Server Error",
-            "detail": str(exc),
+            "detail": "An internal server error occurred while processing the request. Details logged safely.",
             "status_code": 500
         }
     )
@@ -108,11 +130,28 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 
 @app.get("/api/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
+    db_ok = False
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    ns_info = check_ns2_installation()
     return {
-        "status": "online",
+        "status": "online" if db_ok else "degraded",
         "service": "EduNet Analyzer API",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "database": {
+            "connected": db_ok,
+            "engine": "sqlite"
+        },
+        "simulator": {
+            "ns2_installed": ns_info.get("installed", False),
+            "execution_mode": ns_info.get("execution_mode", "DEMO MODE — Sample Data"),
+            "diagnostic": ns_info.get("diagnostic", "")
+        }
     }
 
 # Static file serving & SPA Fallback for production deployment
@@ -152,4 +191,5 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    uvicorn.run("backend.app.main:app", host=host, port=port, reload=True)
+    print(f"[EduNet Analyzer] Starting server on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)

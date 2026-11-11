@@ -1,13 +1,14 @@
 import asyncio
 import json
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db, SessionLocal
 from ..models import Experiment, Result
 from ..schemas import (
     SimulationConfigCreate, SimulationStatusResponse, ResultResponse, ExperimentResponse,
+    ComparisonRequest, ComparisonResponse,
     GbnSimulationRequest, GbnSimulationResponse, LeakyBucketRequest, LeakyBucketResponse
 )
 from ..services.simulation_service import (
@@ -15,7 +16,9 @@ from ..services.simulation_service import (
     run_gbn_simulation, run_leaky_bucket_simulation, run_tcp_udp_comparison_batch,
     run_full_analysis_pipeline, latest_gbn_result, latest_leaky_bucket_result
 )
-from .experiments import format_experiment_response
+from .experiments import (
+    format_experiment_response, get_experiments, get_experiment_by_id, perform_comparison
+)
 
 
 router = APIRouter(prefix="/simulations", tags=["Simulations"])
@@ -81,74 +84,59 @@ def trigger_simulation(
         stage_message="Simulation Pending",
         logs=active_simulations[exp.id]["logs"],
         error=None,
+        error_message=None,
         result=None
     )
 
-@router.get("/{id}/status", response_model=SimulationStatusResponse)
-def get_simulation_status(id: int, db: Session = Depends(get_db)):
-    exp = db.query(Experiment).filter(Experiment.id == id).first()
-    if not exp:
-        raise HTTPException(status_code=404, detail=f"Simulation with ID {id} not found")
-
-    res_resp = None
-    if exp.result:
-        ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
-        res_resp = ResultResponse(
-            id=exp.result.id,
-            experiment_id=exp.result.experiment_id,
-            throughput_kbps=exp.result.throughput_kbps,
-            packet_loss_percent=exp.result.packet_loss_percent,
-            packet_delivery_ratio=exp.result.packet_delivery_ratio,
-            average_delay_ms=exp.result.average_delay_ms,
-            packets_sent=exp.result.packets_sent,
-            packets_received=exp.result.packets_received,
-            packets_dropped=exp.result.packets_dropped,
-            data_rate_kbps=exp.result.data_rate_kbps,
-            summary_notes=exp.result.summary_notes,
-            time_series=ts
-        )
-
-    # Check active memory status
-    state = active_simulations.get(id)
-    if state:
-        return SimulationStatusResponse(
-            id=exp.id,
-            exp_code=exp.exp_code,
-            experiment_id=exp.exp_code,
-            status=state["status"],
-            progress=state.get("progress", state["progress_percent"]),
-            progress_percent=state["progress_percent"],
-            current_stage=state["current_stage"],
-            message=state.get("message", state["stage_message"]),
-            stage_message=state["stage_message"],
-            logs=state["logs"],
-            error=state.get("error"),
-            result=res_resp
-        )
-
-    # If completed and not in active memory
-    progress = 100 if exp.status in ["COMPLETED", "completed"] else 0
-    return SimulationStatusResponse(
-        id=exp.id,
-        exp_code=exp.exp_code,
-        experiment_id=exp.exp_code,
-        status=exp.status.lower(),
-        progress=progress,
-        progress_percent=progress,
-        current_stage="completed" if progress == 100 else exp.status.lower(),
-        message="Simulation completed." if progress == 100 else f"Status: {exp.status}",
-        stage_message="Completed" if progress == 100 else f"Status: {exp.status}",
-        logs=[f"Simulation {exp.exp_code} status: {exp.status}"],
-        error=None,
-        result=res_resp
+@router.get("", response_model=List[ExperimentResponse])
+def list_simulations(
+    protocol: Optional[str] = None,
+    experiment_type: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    mode: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Retrieve list of executed and queued simulations with optional filtering."""
+    return get_experiments(
+        protocol=protocol,
+        experiment_type=experiment_type,
+        status=status,
+        search=search,
+        mode=mode,
+        limit=limit,
+        db=db
     )
 
-@router.get("/{id}/results", response_model=ExperimentResponse)
-def get_simulation_results(id: int, db: Session = Depends(get_db)):
-    exp = db.query(Experiment).filter(Experiment.id == id).first()
-    if not exp:
-        raise HTTPException(status_code=404, detail=f"Simulation with ID {id} not found")
-    return format_experiment_response(exp)
+@router.get("/compare", response_model=ComparisonResponse)
+def compare_simulations_get(
+    ids: Optional[str] = Query(None, description="Comma-separated simulation IDs e.g. ?ids=1,2,3"),
+    id: Optional[List[int]] = Query(None, description="Repeated ID query params e.g. ?id=1&id=2"),
+    db: Session = Depends(get_db)
+):
+    """Compare performance metrics across two or more simulations via GET query parameters."""
+    selected_ids: List[int] = []
+    if id:
+        selected_ids.extend(id)
+    if ids:
+        for part in ids.split(","):
+            part_s = part.strip()
+            if part_s.isdigit():
+                selected_ids.append(int(part_s))
+
+    deduped = list(dict.fromkeys(selected_ids))
+    if len(deduped) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="At least two simulation IDs must be provided for comparison (e.g. ?ids=1,2)"
+        )
+    return perform_comparison(deduped, db)
+
+@router.post("/compare", response_model=ComparisonResponse)
+def compare_simulations_post(request: ComparisonRequest, db: Session = Depends(get_db)):
+    """Compare performance metrics across two or more simulations via JSON POST request."""
+    return perform_comparison(request.experiment_ids, db)
 
 @router.post("/run-full-analysis")
 async def trigger_full_analysis():
@@ -207,6 +195,81 @@ async def trigger_tcp_udp_batch():
         return {"message": "TCP vs UDP multi-rate benchmarks completed successfully", "data": table}
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+@router.get("/{id}", response_model=ExperimentResponse)
+def get_simulation_by_id(id: int, mode: Optional[str] = None, db: Session = Depends(get_db)):
+    """Retrieve details, status, and metrics for a specific simulation by ID."""
+    return get_experiment_by_id(id=id, mode=mode, db=db)
+
+@router.get("/{id}/status", response_model=SimulationStatusResponse)
+def get_simulation_status(id: int, db: Session = Depends(get_db)):
+    exp = db.query(Experiment).filter(Experiment.id == id).first()
+    if not exp:
+        raise HTTPException(status_code=404, detail=f"Simulation with ID {id} not found")
+
+    res_resp = None
+    if exp.result:
+        ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
+        res_resp = ResultResponse(
+            id=exp.result.id,
+            experiment_id=exp.result.experiment_id,
+            throughput_kbps=exp.result.throughput_kbps,
+            packet_loss_percent=exp.result.packet_loss_percent,
+            packet_delivery_ratio=exp.result.packet_delivery_ratio,
+            average_delay_ms=exp.result.average_delay_ms,
+            packets_sent=exp.result.packets_sent,
+            packets_received=exp.result.packets_received,
+            packets_dropped=exp.result.packets_dropped,
+            data_rate_kbps=exp.result.data_rate_kbps,
+            summary_notes=exp.result.summary_notes,
+            time_series=ts
+        )
+
+    # Check active memory status
+    state = active_simulations.get(id)
+    if state:
+        err = state.get("error") or getattr(exp, "error_message", None)
+        return SimulationStatusResponse(
+            id=exp.id,
+            exp_code=exp.exp_code,
+            experiment_id=exp.exp_code,
+            status=state["status"],
+            progress=state.get("progress", state["progress_percent"]),
+            progress_percent=state["progress_percent"],
+            current_stage=state["current_stage"],
+            message=state.get("message", state["stage_message"]),
+            stage_message=state["stage_message"],
+            logs=state["logs"],
+            error=err,
+            error_message=err,
+            result=res_resp
+        )
+
+    # If completed/failed and not in active memory
+    progress = 100 if exp.status in ["COMPLETED", "completed"] else 0
+    err = getattr(exp, "error_message", None)
+    return SimulationStatusResponse(
+        id=exp.id,
+        exp_code=exp.exp_code,
+        experiment_id=exp.exp_code,
+        status=exp.status.lower(),
+        progress=progress,
+        progress_percent=progress,
+        current_stage="completed" if progress == 100 else exp.status.lower(),
+        message="Simulation completed." if progress == 100 else (err or f"Status: {exp.status}"),
+        stage_message="Completed" if progress == 100 else f"Status: {exp.status}",
+        logs=[f"Simulation {exp.exp_code} status: {exp.status}"],
+        error=err,
+        error_message=err,
+        result=res_resp
+    )
+
+@router.get("/{id}/results", response_model=ExperimentResponse)
+def get_simulation_results(id: int, db: Session = Depends(get_db)):
+    exp = db.query(Experiment).filter(Experiment.id == id).first()
+    if not exp:
+        raise HTTPException(status_code=404, detail=f"Simulation with ID {id} not found")
+    return format_experiment_response(exp)
 
 @router.websocket("/ws/{id}")
 async def simulation_websocket_endpoint(websocket: WebSocket, id: int):

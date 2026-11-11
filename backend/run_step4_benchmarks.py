@@ -19,7 +19,17 @@ async def main():
     print("Advanced: Go-Back-N (Tahoe) + Leaky Bucket (Bounded DropTail)")
     print("==================================================================")
     
-    pipeline_res = await run_full_analysis_pipeline(SessionLocal)
+    try:
+        pipeline_res = await run_full_analysis_pipeline(SessionLocal)
+    except RuntimeError as e:
+        print("\n[EduNet Diagnostic] Cannot execute live NS-2 benchmark pipeline:")
+        print(f"  {e}")
+        print("\nNote: On Windows without WSL2 NS-2, EduNet Analyzer operates in calibrated Demo Mode.")
+        print("To run discrete-event simulations with NS-2 on Windows via WSL2:")
+        print("  1. wsl --install -d Ubuntu")
+        print("  2. wsl -d Ubuntu sudo apt update && sudo apt install -y ns2")
+        print("Then restart the server to automatically enable live NS-2 execution.\n")
+        return
     
     print("\nSimulation Pipeline Completed Successfully!")
     
