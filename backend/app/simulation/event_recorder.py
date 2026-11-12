@@ -165,3 +165,4 @@ class EventRecorder:
         deliv = len(self.unique_delivered)
         drop = len(self.unique_dropped)
         return gen == (deliv + drop + in_transit_count)
+

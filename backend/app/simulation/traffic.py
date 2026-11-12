@@ -109,3 +109,4 @@ def get_scenario_config(scenario_name: str, traffic_intensity: str = "Medium") -
             burst_probability=0.10,
             burst_size_range=(2, 4)
         )
+

@@ -54,3 +54,4 @@ class SimulationEvent:
     reason: Optional[str] = None # E.g., "queue_overflow", "normal_delivery", "timeout"
     delay: Optional[float] = None # Calculated end-to-end delay (seconds)
     queue_len: int = 0           # Buffer length at event time
+
