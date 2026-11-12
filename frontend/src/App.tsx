@@ -9,14 +9,12 @@ import { ExperimentHistory } from './pages/ExperimentHistory';
 import { ExperimentComparison } from './pages/ExperimentComparison';
 import { PerformanceAnalysis } from './pages/PerformanceAnalysis';
 import { TcpUdpComparison } from './pages/TcpUdpComparison';
-import { CongestionAnalysis } from './pages/CongestionAnalysis';
 import { SlidingWindow } from './pages/SlidingWindow';
 import { GoBackN } from './pages/GoBackN';
 import { LeakyBucket } from './pages/LeakyBucket';
 import { NetworkTopology } from './pages/NetworkTopology';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
-import { Ns2Setup } from './pages/Ns2Setup';
 
 import { SimulationModeProvider } from './context/SimulationModeContext';
 
@@ -46,7 +44,7 @@ export const App: React.FC = () => {
             <Route path="/compare" element={<Navigate to="/comparison" replace />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
             <Route path="/tcp-udp" element={<TcpUdpComparison />} />
-            <Route path="/congestion" element={<CongestionAnalysis />} />
+            <Route path="/congestion" element={<Navigate to="/leaky-bucket" replace />} />
 
             {/* Reliable Transmission Routes */}
             <Route path="/sliding-window" element={<SlidingWindow />} />
@@ -65,7 +63,7 @@ export const App: React.FC = () => {
 
             {/* Settings & Setup */}
             <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/ns2" element={<Ns2Setup />} />
+            <Route path="/settings/ns2" element={<Navigate to="/settings" replace />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

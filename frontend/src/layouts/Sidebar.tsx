@@ -52,9 +52,9 @@ const navSections: NavSection[] = [
   {
     title: 'Analysis',
     items: [
+      { path: '/comparison', label: 'Experiment Comparison', icon: GitCompare },
       { path: '/performance', label: 'Performance Analysis', icon: Users, badge: 'Load' },
       { path: '/tcp-udp', label: 'TCP vs UDP', icon: Zap },
-      { path: '/congestion', label: 'Congestion Analysis', icon: Gauge },
     ],
   },
   {
@@ -67,7 +67,7 @@ const navSections: NavSection[] = [
   {
     title: 'Traffic Control',
     items: [
-      { path: '/leaky-bucket', label: 'Leaky Bucket', icon: Sliders },
+      { path: '/leaky-bucket', label: 'Traffic Shaping & Congestion', icon: Sliders },
     ],
   },
   {
@@ -84,8 +84,7 @@ const navSections: NavSection[] = [
   {
     title: 'Settings',
     items: [
-      { path: '/settings', label: 'System Status', icon: SettingsIcon },
-      { path: '/settings/ns2', label: 'NS-2 Setup', icon: Terminal, badge: 'WSL2' },
+      { path: '/settings', label: 'System & Simulator Settings', icon: SettingsIcon },
     ],
   },
 ];

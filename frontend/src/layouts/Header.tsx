@@ -35,14 +35,15 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       case '/compare': return 'Multi-Experiment Comparison';
       case '/performance': return 'Performance Analysis';
       case '/tcp-udp': return 'TCP vs UDP Comparison';
-      case '/congestion': return 'Congestion Control: Leaky Bucket';
+      case '/congestion': return 'Traffic Shaping & Congestion';
+      case '/leaky-bucket': return 'Traffic Shaping & Congestion';
       case '/sliding-window': return 'Sliding Window Protocol';
       case '/go-back-n': return 'Go-Back-N ARQ Protocol';
       case '/network': return 'E-Learning Network Topology';
       case '/topology': return 'E-Learning Network Topology';
       case '/reports': return 'Laboratory Reports Hub';
-      case '/settings': return 'System Settings';
-      case '/settings/ns2': return 'NS-2 WSL Configuration';
+      case '/settings': return 'System & Simulator Settings';
+      case '/settings/ns2': return 'System & Simulator Settings';
       default:
         if (location.pathname.startsWith('/experiments/')) return 'Experiment Results';
         if (location.pathname.startsWith('/simulation/')) return 'Simulation Monitor';

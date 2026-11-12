@@ -128,6 +128,22 @@ export const LeakyBucket: React.FC = () => {
     return () => clearInterval(interval);
   }, [isRunning, bucketCapacity, leakRate, burstRate]);
 
+  const handleTriggerBurst = () => {
+    setCurrentBuffer((prev) => {
+      const burstSize = 25;
+      const potential = prev + burstSize;
+      let dropped = 0;
+      let stored = potential;
+      if (potential > bucketCapacity) {
+        dropped = potential - bucketCapacity;
+        stored = bucketCapacity;
+        setDroppedCount((d) => d + dropped);
+      }
+      setTotalInflow((t) => t + burstSize);
+      return stored;
+    });
+  };
+
   const handleReset = () => {
     setCurrentBuffer(10);
     setTotalInflow(0);
@@ -145,22 +161,22 @@ export const LeakyBucket: React.FC = () => {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-[#0F172A] tracking-tight">
-              Leaky Bucket Traffic Shaping & Congestion Control
+              Traffic Shaping & Congestion Analysis
             </h1>
             <ModeBadge />
           </div>
           <p className="text-xs text-[#64748B] mt-1">
-            Real NS-2 bounded-queue shaping experiment compared side-by-side with unshaped bursty traffic, plus interactive tank model.
+            Real NS-2 bounded-queue shaping experiment compared side-by-side with unshaped bursty traffic, plus interactive tank model and queue congestion analysis.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Link
-            to="/congestion"
-            className="flex items-center gap-2 px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-xs transition"
+            to="/simulation/new?type=Leaky%20Bucket"
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition"
           >
-            Congestion Analysis
-            <ArrowRight className="w-3.5 h-3.5" />
+            <PlayCircle className="w-4 h-4" />
+            Configure Custom Shaper
           </Link>
         </div>
       </div>
@@ -354,6 +370,15 @@ export const LeakyBucket: React.FC = () => {
               <RotateCcw className="w-4 h-4" />
               Reset Counters
             </button>
+
+            <button
+              onClick={handleTriggerBurst}
+              className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold transition"
+              title="Inject an instant 25-packet burst from online exam submission"
+            >
+              <Zap className="w-4 h-4 text-purple-600" />
+              Inject +25 Pkt Burst
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -507,6 +532,42 @@ export const LeakyBucket: React.FC = () => {
                 <Area type="monotone" dataKey="outflow" stroke="#16A34A" fill="url(#outflowGrad)" name="Shaped Outflow (pkts)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Congestion Control & Queue Analysis Card */}
+        <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+            <Layers className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-bold text-[#0F172A]">
+              Congestion Analysis: Router Buffer Overflow & Traffic Regulation
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs leading-relaxed text-slate-600">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                Unregulated Burst Congestion
+              </span>
+              <p>
+                In a university e-learning network, hundreds of concurrent students may perform synchronized operations (e.g. streaming an online lecture or clicking &ldquo;Submit Quiz&rdquo;). This produces high instantaneous burst arrival rates exceeding the 1 Mbps bottleneck capacity.
+              </p>
+              <p>
+                Without traffic shaping, standard DropTail routers quickly exhaust their limited queue capacity (typically 10&ndash;25 packets), leading to severe tail drops, TCP timeout cascades, and global synchronization.
+              </p>
+            </div>
+            <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-2">
+              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                Leaky Bucket Traffic Shaping Solution
+              </span>
+              <p>
+                The Leaky Bucket algorithm acts as a traffic regulator at the border router ($R_1$). Bursts are held in a bounded buffer tank and metered out at a strictly constant leak rate (&rho;).
+              </p>
+              <p>
+                This eliminates instantaneous traffic spikes, preventing downstream bottleneck queue exhaustion, stabilizing end-to-end latency, and reducing overall packet loss across the campus core network.
+              </p>
+            </div>
           </div>
         </div>
       </div>
