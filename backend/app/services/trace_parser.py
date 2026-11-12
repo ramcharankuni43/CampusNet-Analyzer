@@ -51,6 +51,7 @@ def parse_ns2_trace_file(
             "packets_dropped": 0,
             "lost_packets": 0,
             "retransmissions": 0,
+            "duplicate_deliveries": 0,
             "total_transmissions": 0,
             "data_rate_kbps": 0.0,
             "time_series": []
@@ -65,6 +66,7 @@ def parse_ns2_trace_file(
     dropped_packet_events = 0
     total_transmissions_sent = 0
     retransmissions_count = 0
+    duplicate_deliveries_count = 0
 
     target_dest: Optional[int] = server_node_id if (server_node_id is not None and server_node_id >= 0) else None
 
@@ -137,13 +139,16 @@ def parse_ns2_trace_file(
                     retransmissions_count += 1
 
             # 2. Packet arrival at destination LMS server
-            elif event == "r" and (to_node == target_dest or to_node == dst_node):
-                total_received_bytes += pkt_size
-                time_series_data[sec_bucket]["bytes_received"] += pkt_size
+            # Count only when arriving at the final destination server, never at intermediate nodes
+            is_at_destination = (to_node == target_dest) if (target_dest is not None) else (to_node == dst_node)
 
+            if event == "r" and is_at_destination:
                 # Avoid duplicate packet counting: only record the first delivery of unique packet
+                # for application-level goodput, received packet count, and delay
                 if pkt_key not in unique_received_keys:
                     unique_received_keys.add(pkt_key)
+                    total_received_bytes += pkt_size
+                    time_series_data[sec_bucket]["bytes_received"] += pkt_size
                     time_series_data[sec_bucket]["packets_received"] += 1
 
                     # End-to-end delay calculation from initial generation time
@@ -152,6 +157,9 @@ def parse_ns2_trace_file(
                         if delay >= 0:
                             packet_delays.append(delay)
                             time_series_data[sec_bucket]["delay_sum"] += delay
+                else:
+                    # Duplicate / retransmitted packet delivery at destination
+                    duplicate_deliveries_count += 1
 
             # 3. Packet dropped at intermediate queue or error model
             elif event == "d":
@@ -211,6 +219,7 @@ def parse_ns2_trace_file(
         "packets_dropped": dropped_packet_events,
         "lost_packets": lost_packets,
         "retransmissions": retransmissions_count,
+        "duplicate_deliveries": duplicate_deliveries_count,
         "total_transmissions": total_transmissions_sent,
         "data_rate_kbps": throughput_kbps,
         "time_series": final_time_series

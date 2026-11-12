@@ -244,7 +244,26 @@ export const GoBackN: React.FC = () => {
 
         {/* NS-2 Real Metrics Cards */}
         {ns2Result ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="space-y-3">
+            {ns2Result.protocol_model && (
+              <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-lg text-xs text-indigo-950 flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    Model: {ns2Result.protocol_model}
+                  </span>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-white text-indigo-800 border border-indigo-200">
+                    {ns2Result.is_demo ? 'DEMO BENCHMARK' : 'LIVE NS-2'}
+                  </span>
+                </div>
+                {ns2Result.model_description && (
+                  <p className="text-[11px] text-indigo-800/90 leading-relaxed">
+                    {ns2Result.model_description}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-[11px] text-slate-500">Packets Sent</span>
               <div className="text-lg font-bold text-[#0F172A]">{ns2Result.packets_sent}</div>
@@ -268,6 +287,7 @@ export const GoBackN: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
         ) : (
           <div className="p-4 bg-slate-50 rounded-lg text-center text-xs text-slate-500">
             No NS-2 Go-Back-N trace loaded yet. Click &ldquo;Run NS-2 Go-Back-N&rdquo; to execute simulation in WSL2.

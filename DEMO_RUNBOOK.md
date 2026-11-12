@@ -1,6 +1,6 @@
-# EduNet Analyzer — College Demonstration Runbook (7–10 Minutes)
+# CampusNet-Analyzer — College Demonstration Runbook (7–10 Minutes)
 
-This document provides a step-by-step presentation script, technical explanations, command references, and defense points for demonstrating **EduNet Analyzer: University E-Learning Network Performance Simulator** in an academic or college viva examination.
+This document provides a step-by-step presentation script, technical explanations, command references, and defense points for demonstrating **CampusNet-Analyzer: University Campus & E-Learning Network Performance Simulator** in an academic or college viva examination.
 
 ---
 

@@ -285,6 +285,8 @@ class GbnSimulationResponse(BaseModel):
     retransmissions: int
     trace_points: List[Dict[str, Any]]
     summary: str
+    protocol_model: Optional[str] = "Textbook Go-Back-N ARQ"
+    model_description: Optional[str] = None
     is_demo: Optional[bool] = False
 
 class LeakyBucketRequest(BaseModel):
@@ -302,5 +304,7 @@ class LeakyBucketResponse(BaseModel):
     shaped_loss_percent: float
     comparison_series: List[Dict[str, Any]]
     summary: str
+    shaper_model: Optional[str] = "Textbook Leaky Bucket Traffic Shaper"
+    model_description: Optional[str] = None
     is_demo: Optional[bool] = False
 

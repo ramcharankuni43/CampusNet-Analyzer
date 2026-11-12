@@ -2,7 +2,7 @@
 # Experiment ID: 4 | Users: 100 | Protocol: TCP
 set ns [new Simulator]
 
-set tracefile [open "F:/EduNet Analyzer/backend/simulation/traces/experiment_4.tr" w]
+set tracefile [open "simulation/traces/experiment_4.tr" w]
 $ns trace-all $tracefile
 
 # Node Definitions

@@ -36,7 +36,7 @@ def generate_experiment_csv(experiment, result) -> str:
         "Timestamp"
     ])
     
-    mode = "Demo Mode (Sample Data)" if experiment.is_demo else "NS-2 Live Simulation"
+    mode = "DEMO BENCHMARK (Sample Evaluation)" if experiment.is_demo else "LIVE NS-2 TRACE (Discrete-Event Execution)"
     
     tp = result.throughput_kbps if result else 0.0
     loss = result.packet_loss_percent if result else 0.0
@@ -135,12 +135,12 @@ def generate_experiment_pdf(experiment, result) -> bytes:
     elements = []
 
     # 1. Header Banner
-    elements.append(Paragraph("EduNet Analyzer — Laboratory Performance Report", title_style))
-    elements.append(Paragraph("Course: Computer Networks & Internet Protocols Lab | Project #4: E-Learning Network Analysis", subtitle_style))
+    elements.append(Paragraph("CampusNet-Analyzer — Laboratory Performance Report", title_style))
+    elements.append(Paragraph("Course: Computer Networks Lab | University Campus E-Learning Network Performance Simulator", subtitle_style))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=14))
 
     # 2. Experiment Metadata Card Table
-    mode_str = "DEMO MODE (Validated Academic Sample)" if experiment.is_demo else "NS-2 LIVE SIMULATION"
+    mode_str = "DEMO BENCHMARK (Calibrated Sample Evaluation)" if experiment.is_demo else "LIVE NS-2 SIMULATION (Trace Verified)"
     meta_data = [
         [
             Paragraph("<b>Experiment ID:</b>", body_style), Paragraph(str(experiment.exp_code), body_style),
@@ -160,7 +160,7 @@ def generate_experiment_pdf(experiment, result) -> bytes:
         ],
         [
             Paragraph("<b>Duration:</b>", body_style), Paragraph(f"{experiment.simulation_time} Seconds", body_style),
-            Paragraph("<b>Execution Engine:</b>", body_style), Paragraph(f"<b>{mode_str}</b>", body_style)
+            Paragraph("<b>Data Source:</b>", body_style), Paragraph(f"<b>{mode_str}</b>", body_style)
         ],
     ]
     meta_table = Table(meta_data, colWidths=[110, 160, 110, 150])

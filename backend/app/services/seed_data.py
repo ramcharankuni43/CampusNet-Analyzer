@@ -11,8 +11,8 @@ from .trace_parser import parse_ns2_trace_file
 SAMPLE_CONFIGS = [
     {
         "code": "EXP-001",
-        "name": "Baseline TCP E-Learning Workload",
-        "description": "Baseline evaluation of 10 student clients streaming e-learning courseware over TCP NewReno.",
+        "name": "[DEMO BENCHMARK] Baseline TCP E-Learning Workload",
+        "description": "[DEMO DATA / Sample Evaluation] Baseline evaluation of 10 student clients streaming e-learning courseware over TCP NewReno.",
         "users": 10,
         "protocol": "TCP",
         "traffic_level": "Low",
@@ -23,8 +23,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-002",
-        "name": "Baseline UDP Video Stream",
-        "description": "Uncontrolled CBR video stream transmission for 10 users over UDP to inspect baseline packet delivery.",
+        "name": "[DEMO BENCHMARK] Baseline UDP Video Stream",
+        "description": "[DEMO DATA / Sample Evaluation] Uncontrolled CBR video stream transmission for 10 users over UDP to inspect baseline packet delivery.",
         "users": 10,
         "protocol": "UDP",
         "traffic_level": "Low",
@@ -35,8 +35,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-003",
-        "name": "Medium Traffic Class Lecture (TCP)",
-        "description": "Mid-sized cohort of 50 simultaneous students interacting with online quiz portal.",
+        "name": "[DEMO BENCHMARK] Medium Traffic Class Lecture (TCP)",
+        "description": "[DEMO DATA / Sample Evaluation] Mid-sized cohort of 50 simultaneous students interacting with online quiz portal.",
         "users": 50,
         "protocol": "TCP",
         "traffic_level": "Medium",
@@ -47,8 +47,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-004",
-        "name": "High Traffic Campus Peak Load (TCP)",
-        "description": "Peak campus load of 100 students accessing multimedia laboratory resources simultaneously.",
+        "name": "[DEMO BENCHMARK] High Traffic Campus Peak Load (TCP)",
+        "description": "[DEMO DATA / Sample Evaluation] Peak campus load of 100 students accessing multimedia laboratory resources simultaneously.",
         "users": 100,
         "protocol": "TCP",
         "traffic_level": "High",
@@ -59,8 +59,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-005",
-        "name": "High Traffic Video Broadcast (UDP)",
-        "description": "Stress testing bottleneck core link with 100 simultaneous UDP lecture video streams.",
+        "name": "[DEMO BENCHMARK] High Traffic Video Broadcast (UDP)",
+        "description": "[DEMO DATA / Sample Evaluation] Stress testing bottleneck core link with 100 simultaneous UDP lecture video streams.",
         "users": 100,
         "protocol": "UDP",
         "traffic_level": "High",
@@ -71,8 +71,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-006",
-        "name": "Leaky Bucket Congestion Control",
-        "description": "Traffic shaping demonstration using RED / Leaky Bucket queue smoothing at the border router.",
+        "name": "[DEMO BENCHMARK] Leaky Bucket Congestion Control",
+        "description": "[DEMO DATA / Sample Evaluation] Traffic shaping demonstration using Leaky Bucket queue smoothing at the border router.",
         "users": 50,
         "protocol": "TCP",
         "traffic_level": "High",
@@ -83,8 +83,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-007",
-        "name": "Sliding Window Reliability Benchmark",
-        "description": "Analysis of sliding window flow control dynamics with 25 students accessing assignment repository.",
+        "name": "[DEMO BENCHMARK] Sliding Window Reliability Benchmark",
+        "description": "[DEMO DATA / Sample Evaluation] Analysis of sliding window flow control dynamics with 25 students accessing assignment repository.",
         "users": 25,
         "protocol": "TCP",
         "traffic_level": "Medium",
@@ -95,8 +95,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-008",
-        "name": "Go-Back-N Protocol Retransmission",
-        "description": "Evaluation of cumulative acknowledgement and recovery behavior across 50 nodes.",
+        "name": "[DEMO BENCHMARK] Go-Back-N Protocol Retransmission",
+        "description": "[DEMO DATA / Sample Evaluation] Evaluation of Go-Back-N cumulative acknowledgement and window recovery behavior across 50 nodes.",
         "users": 50,
         "protocol": "TCP",
         "traffic_level": "High",
@@ -107,8 +107,8 @@ SAMPLE_CONFIGS = [
     },
     {
         "code": "EXP-009",
-        "name": "University E-Learning Performance Test",
-        "description": "Campus-wide concurrent lecture streaming workload evaluating TCP Reno congestion behavior across 100 student nodes under peak university lecture load.",
+        "name": "[DEMO BENCHMARK] University E-Learning Performance Test",
+        "description": "[DEMO DATA / Sample Evaluation] Campus-wide concurrent lecture streaming workload evaluating TCP Reno congestion behavior across 100 student nodes under peak university lecture load.",
         "users": 100,
         "protocol": "TCP",
         "traffic_level": "High",

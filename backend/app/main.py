@@ -55,8 +55,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="EduNet Analyzer API",
-    description="University E-Learning Network Performance Simulation & Analysis Engine",
+    title="CampusNet-Analyzer API",
+    description="University Campus & E-Learning Network Performance Simulation & Analysis Engine",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -141,7 +141,7 @@ def health_check(db: Session = Depends(get_db)):
     ns_info = check_ns2_installation()
     return {
         "status": "online" if db_ok else "degraded",
-        "service": "EduNet Analyzer API",
+        "service": "CampusNet-Analyzer API",
         "version": "1.0.0",
         "database": {
             "connected": db_ok,

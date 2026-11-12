@@ -232,7 +232,26 @@ export const LeakyBucket: React.FC = () => {
 
         {/* Real NS-2 KPI Metrics Comparison */}
         {ns2Result ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            {ns2Result.shaper_model && (
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg text-xs text-purple-950 flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-purple-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                    Model: {ns2Result.shaper_model}
+                  </span>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-white text-purple-800 border border-purple-200">
+                    {ns2Result.is_demo ? 'DEMO BENCHMARK' : 'LIVE NS-2'}
+                  </span>
+                </div>
+                {ns2Result.model_description && (
+                  <p className="text-[11px] text-purple-800/90 leading-relaxed">
+                    {ns2Result.model_description}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-purple-50/70 rounded-xl border border-purple-200 space-y-2">
               <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">
                 Scenario A: Without Leaky Bucket (Raw Bursts)
@@ -258,6 +277,7 @@ export const LeakyBucket: React.FC = () => {
                 Queue absorbs transient bursts and leaks packets at constant bit rate, stabilizing delivery.
               </p>
             </div>
+          </div>
           </div>
         ) : (
           <div className="p-4 bg-slate-50 rounded-lg text-center text-xs text-slate-500">

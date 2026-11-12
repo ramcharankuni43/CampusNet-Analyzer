@@ -978,12 +978,23 @@ def generate_calibrated_gbn_demo_trace(
     loss_rate: float = 0.05,
     sim_time: float = 10.0
 ) -> Dict[str, Any]:
-    """Generates calibrated Go-Back-N trace matching NS-2 Tahoe packet dynamics."""
-    total_packets = int(sim_time * 25)
+    """
+    Authentic discrete-event simulation of textbook Go-Back-N ARQ:
+    - Sender Window: Fixed size N = window_size
+    - Sequence numbers: base (oldest unacknowledged packet) and next_seq_num
+    - Sliding Window constraint: next_seq_num < base + N
+    - Receiver: accepts in-order packet (seq == expected_seq), emits cumulative ACK.
+      Out-of-order packets are discarded by receiver, re-emitting ACK for expected_seq - 1.
+    - Timeout: If packet base is unacknowledged within RTO (0.2s), timer expires:
+      Go-Back-N sender resets next_seq_num to base, and retransmits all unacked packets in window.
+    """
     time_cursor = 0.1
-    seq = 0
-    pkt_id = 0
+    base = 0
+    next_seq_num = 0
+    expected_seq_num = 0
+    max_packets = max(20, int(sim_time * 20))
 
+    pkt_id = 0
     lines = []
     trace_points = []
     packets_sent = 0
@@ -991,53 +1002,123 @@ def generate_calibrated_gbn_demo_trace(
     packets_dropped = 0
     retransmissions = 0
 
+    packet_timers: Dict[int, float] = {}
+    rto = 0.200 # 200ms retransmission timeout
     drop_interval = max(3, int(1.0 / loss_rate)) if loss_rate > 0 else 999999
-    unacked: Dict[int, float] = {}
 
-    while seq < total_packets and time_cursor < sim_time - 0.5:
-        while len(unacked) < window_size and seq < total_packets and time_cursor < sim_time - 0.5:
+    while time_cursor < sim_time - 0.5 and (base < max_packets):
+        # 1. Check if timer for oldest unacknowledged packet (base) has expired
+        if base in packet_timers and (time_cursor >= packet_timers[base] + rto):
+            # GO-BACK-N TIMEOUT! Retransmit all unacknowledged packets: base .. next_seq_num - 1
+            time_cursor += 0.005
+            for retrans_seq in range(base, next_seq_num):
+                if time_cursor >= sim_time - 0.5:
+                    break
+                pkt_id += 1
+                packets_sent += 1
+                retransmissions += 1
+                packet_timers[retrans_seq] = time_cursor
+
+                lines.append(f"+ {time_cursor:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                lines.append(f"- {time_cursor + 0.0008:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                lines.append(f"r {time_cursor + 0.0058:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+
+                if len(trace_points) < 350:
+                    trace_points.append({
+                        "time": round(time_cursor, 4),
+                        "seq_num": retrans_seq,
+                        "event": "retransmit",
+                        "is_retransmit": True
+                    })
+
+                # Check channel loss on retransmission
+                is_loss = (pkt_id % drop_interval == 0) and loss_rate > 0
+                arr_r2 = time_cursor + 0.0258
+                arr_dest = time_cursor + 0.0278
+
+                if is_loss:
+                    lines.append(f"d {time_cursor + 0.0158:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                    packets_dropped += 1
+                    if len(trace_points) < 350:
+                        trace_points.append({
+                            "time": round(time_cursor + 0.0158, 4),
+                            "seq_num": retrans_seq,
+                            "event": "drop",
+                            "is_retransmit": True
+                        })
+                else:
+                    lines.append(f"- {time_cursor + 0.0058:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                    lines.append(f"r {arr_r2:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                    lines.append(f"r {arr_dest:.6f} 2 3 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+
+                    if retrans_seq == expected_seq_num:
+                        expected_seq_num += 1
+                        packets_received += 1
+                        base = expected_seq_num
+                    else:
+                        # Out-of-order discard by GBN receiver
+                        lines.append(f"d {arr_dest:.6f} 2 3 tcp 1024 ------- 1 0.0 3.0 {retrans_seq} {pkt_id}")
+                        packets_dropped += 1
+
+                time_cursor += 0.012
+            continue
+
+        # 2. Transmit new packets while window has capacity (next_seq_num < base + window_size)
+        if next_seq_num < base + window_size and next_seq_num < max_packets:
+            seq = next_seq_num
+            next_seq_num += 1
             pkt_id += 1
-            is_drop = (pkt_id % drop_interval == 0) and loss_rate > 0
+            packets_sent += 1
+            packet_timers[seq] = time_cursor
 
             lines.append(f"+ {time_cursor:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
             lines.append(f"- {time_cursor + 0.0008:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
             lines.append(f"r {time_cursor + 0.0058:.6f} 0 1 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
-            packets_sent += 1
 
-            trace_points.append({
-                "time": round(time_cursor, 4),
-                "seq_num": seq,
-                "event": "send",
-                "is_retransmit": False
-            })
+            if len(trace_points) < 350:
+                trace_points.append({
+                    "time": round(time_cursor, 4),
+                    "seq_num": seq,
+                    "event": "send",
+                    "is_retransmit": False
+                })
+
+            # Check channel loss
+            is_drop = (pkt_id % drop_interval == 0) and loss_rate > 0
+            arr_r2 = time_cursor + 0.0258
+            arr_dest = time_cursor + 0.0278
 
             if is_drop:
                 lines.append(f"d {time_cursor + 0.0158:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
                 packets_dropped += 1
-                trace_points.append({
-                    "time": round(time_cursor + 0.0158, 4),
-                    "seq_num": seq,
-                    "event": "drop",
-                    "is_retransmit": False
-                })
-                time_cursor += 0.200 # RTO timeout
-                retransmissions += len(unacked) + 1
-                unacked.clear()
-                break
+                if len(trace_points) < 350:
+                    trace_points.append({
+                        "time": round(time_cursor + 0.0158, 4),
+                        "seq_num": seq,
+                        "event": "drop",
+                        "is_retransmit": False
+                    })
             else:
                 lines.append(f"- {time_cursor + 0.0058:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
-                lines.append(f"r {time_cursor + 0.0258:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
-                lines.append(f"r {time_cursor + 0.0278:.6f} 2 3 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
-                packets_received += 1
-                unacked[seq] = time_cursor
-                seq += 1
+                lines.append(f"r {arr_r2:.6f} 1 2 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
+                lines.append(f"r {arr_dest:.6f} 2 3 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
 
-            time_cursor += 0.008
+                if seq == expected_seq_num:
+                    expected_seq_num += 1
+                    packets_received += 1
+                    base = expected_seq_num
+                else:
+                    # GBN receiver discards out-of-order arrival
+                    lines.append(f"d {arr_dest:.6f} 2 3 tcp 1024 ------- 1 0.0 3.0 {seq} {pkt_id}")
+                    packets_dropped += 1
 
-        if unacked:
-            first_seq = min(unacked.keys())
-            del unacked[first_seq]
             time_cursor += 0.015
+        else:
+            # Window full, advance time to base timeout or next ACK
+            if base in packet_timers:
+                time_cursor = packet_timers[base] + rto
+            else:
+                time_cursor += 0.020
 
     with open(trace_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -1075,19 +1156,32 @@ async def run_gbn_simulation(
         tcl_path, tr_path = generate_gbn_tcl_script(code, window_size, loss_rate, sim_time, is_wsl=is_wsl, run_dir=run_dir)
         await execute_ns2_command_async(tcl_path, sim_time, run_dir=run_dir)
         parsed = parse_gbn_sequence_trace(tr_path, sender_node_id=0, dest_node_id=3)
+        protocol_model = "NS-2 TCP Tahoe Flow Control Approximation"
+        model_desc = (
+            f"Simulates sliding-window flow control with cumulative acknowledgements using NS-2 Agent/TCP (Tahoe). "
+            f"Window size is fixed to N={window_size}. Note that TCP Tahoe includes slow start, fast retransmit, "
+            f"and AIMD congestion control, which approximates but differs from pure textbook Go-Back-N ARQ."
+        )
         summary = (
-            f"NS-2 Go-Back-N (Tahoe Approximation) with window size N={window_size} and {int(loss_rate * 100)}% link loss: "
-            f"{parsed['packets_sent']} packets sent, {parsed['retransmissions']} retransmissions after timeout, "
-            f"{parsed['packets_dropped']} drops, and {parsed['packets_received']} successfully acknowledged."
+            f"NS-2 TCP Tahoe Cumulative ACK Model (Go-Back-N Flow Control): window size N={window_size}, "
+            f"{int(loss_rate * 100)}% link loss: {parsed['packets_sent']} packets sent, "
+            f"{parsed['retransmissions']} retransmissions after timeout, {parsed['packets_dropped']} drops, "
+            f"and {parsed['packets_received']} successfully acknowledged."
         )
         is_demo_flag = False
     else:
         tr_path = os.path.join(run_dir, "trace.tr")
         parsed = generate_calibrated_gbn_demo_trace(tr_path, window_size, loss_rate, sim_time)
+        protocol_model = "Textbook Go-Back-N ARQ (Sliding Window N)"
+        model_desc = (
+            f"Authentic discrete-event simulation of textbook Go-Back-N ARQ. Operates with a fixed sliding window "
+            f"of size N={window_size}, cumulative acknowledgements, receiver out-of-order packet discards, and "
+            f"complete window retransmission starting from base upon timer expiration, without congestion-window throttling."
+        )
         summary = (
-            f"[DEMO MODE] Calibrated Go-Back-N (Tahoe Approximation): window size N={window_size}, "
-            f"{int(loss_rate * 100)}% link loss, {parsed['packets_sent']} packets sent, "
-            f"{parsed['retransmissions']} retransmissions, {parsed['packets_dropped']} drops."
+            f"[DEMO BENCHMARK] Textbook Go-Back-N ARQ: window size N={window_size}, "
+            f"{int(loss_rate * 100)}% link loss: {parsed['packets_sent']} packets sent, "
+            f"{parsed['retransmissions']} retransmissions upon timeout, {parsed['packets_dropped']} drops."
         )
         is_demo_flag = True
 
@@ -1100,6 +1194,8 @@ async def run_gbn_simulation(
         "retransmissions": parsed["retransmissions"],
         "trace_points": parsed["trace_points"],
         "summary": summary,
+        "protocol_model": protocol_model,
+        "model_description": model_desc,
         "is_demo": is_demo_flag
     }
     latest_gbn_result = result
@@ -1235,29 +1331,121 @@ def generate_calibrated_leaky_bucket_demo_trace(
     leak_rate: str = "512Kbps",
     sim_time: float = 10.0
 ) -> Dict[str, Any]:
-    """Generates paired calibrated traces for unshaped bursty traffic vs Leaky Bucket shaped traffic."""
-    generate_calibrated_demo_trace(
-        unshaped_tr_path,
-        users=20,
-        protocol="UDP",
-        data_rate_str="2 Mbps",
-        sim_duration=sim_time,
-        experiment_type="Normal Traffic",
-        bucket_size=10
-    )
-    generate_calibrated_demo_trace(
-        shaped_tr_path,
-        users=20,
-        protocol="UDP",
-        data_rate_str=leak_rate,
-        sim_duration=sim_time,
-        experiment_type="Leaky Bucket",
-        bucket_size=bucket_size
-    )
+    """
+    Authentic discrete-event simulation of textbook Leaky Bucket Traffic Shaping:
+    - Bursty source: Periodic ON/OFF bursts (peak rate 2.5 Mbps during ON period of 0.4s, 0 Mbps during OFF period of 0.6s).
+    - Unshaped traffic: Injected directly into bottleneck link with a small 10-packet DropTail queue.
+      Bursts rapidly overflow intermediate queue buffers, causing heavy Tail-Drop discards.
+    - Leaky Bucket shaped traffic: Passes through Leaky Bucket buffer node with capacity B = bucket_size.
+      Departures are regulated to a strictly constant output rate (leak_rate = 512 Kbps),
+      smoothing bursty spikes into a constant-rate stream and preventing downstream buffer overflow.
+    """
+    # 1. Determine leak rate in packets per second (1024-byte packets)
+    bw_clean = clean_bw_for_tcl(leak_rate)
+    rate_bps = 512000.0
+    if "mb" in bw_clean.lower():
+        val = float(bw_clean.lower().replace("mb", ""))
+        rate_bps = val * 1000000.0
+    elif "kb" in bw_clean.lower():
+        val = float(bw_clean.lower().replace("kb", ""))
+        rate_bps = val * 1000.0
+
+    leak_rate_pps = max(10.0, rate_bps / (1024.0 * 8.0))
+    leak_interval = 1.0 / leak_rate_pps # Constant time interval between successive leaking packets
+
+    # Peak burst parameters (2.5 Mbps burst)
+    burst_rate_pps = 305.0 # ~2.5 Mbps of 1024-byte packets
+    burst_iat = 1.0 / burst_rate_pps # ~3.28 ms between burst packets
+
+    # Generate burst arrival schedule
+    arrivals: List[float] = []
+    t = 0.1
+    cycle_period = 1.0
+    on_period = 0.35
+
+    while t < sim_time - 0.5:
+        cycle_start = t
+        while t < cycle_start + on_period and t < sim_time - 0.5:
+            arrivals.append(t)
+            t += burst_iat
+        t = cycle_start + cycle_period
+
+    # --- A. Generate Unshaped Trace (Small 10-packet router buffer) ---
+    unshaped_lines = []
+    unshaped_queue = 0
+    next_unshaped_departure = 0.1
+    unshaped_queue_limit = 10
+
+    for pkt_idx, arr_t in enumerate(arrivals, start=1):
+        # Service queued packets up to arr_t
+        if arr_t > next_unshaped_departure:
+            serviced = int((arr_t - next_unshaped_departure) * leak_rate_pps)
+            unshaped_queue = max(0, unshaped_queue - serviced)
+
+        # Enqueue at source (node 0 -> access router 1)
+        unshaped_lines.append(f"+ {arr_t:.6f} 0 1 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+        unshaped_lines.append(f"- {arr_t + 0.0008:.6f} 0 1 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+        arr_r1 = arr_t + 0.0058
+        unshaped_lines.append(f"r {arr_r1:.6f} 0 1 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+
+        # Check queue limit on bottleneck link 1 -> 2
+        if unshaped_queue >= unshaped_queue_limit:
+            # Buffer overflow! Unshaped packet drop
+            unshaped_lines.append(f"d {arr_r1:.6f} 1 2 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+        else:
+            unshaped_queue += 1
+            dep_time = max(arr_r1, next_unshaped_departure) + leak_interval
+            next_unshaped_departure = dep_time
+
+            unshaped_lines.append(f"- {dep_time:.6f} 1 2 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+            arr_r2 = dep_time + 0.020
+            unshaped_lines.append(f"r {arr_r2:.6f} 1 2 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+            arr_srv = arr_r2 + 0.002
+            unshaped_lines.append(f"r {arr_srv:.6f} 2 3 cbr 1024 ------- 1 0.0 3.0 {pkt_idx} {pkt_idx}")
+
+    with open(unshaped_tr_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(unshaped_lines))
+
+    # --- B. Generate Leaky Bucket Shaped Trace ---
+    shaped_lines = []
+    bucket_occupancy = 0
+    next_leak_time = 0.1
+
+    for pkt_idx, arr_t in enumerate(arrivals, start=1):
+        # Leak packets from bucket at strictly constant rate up to arr_t
+        if arr_t > next_leak_time:
+            leaked = int((arr_t - next_leak_time) * leak_rate_pps)
+            bucket_occupancy = max(0, bucket_occupancy - leaked)
+
+        # Enqueue at source (node 0 -> access router 1)
+        shaped_lines.append(f"+ {arr_t:.6f} 0 1 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+        shaped_lines.append(f"- {arr_t + 0.0008:.6f} 0 1 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+        arr_shaper = arr_t + 0.0028
+        shaped_lines.append(f"r {arr_shaper:.6f} 0 1 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+
+        # Check Leaky Bucket capacity (bucket_size)
+        if bucket_occupancy >= bucket_size:
+            # Bucket buffer overflow! Excess burst packet discarded
+            shaped_lines.append(f"d {arr_shaper:.6f} 1 2 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+        else:
+            bucket_occupancy += 1
+            # Packets leak out at strictly constant intervals
+            dep_shaper = max(arr_shaper, next_leak_time) + leak_interval
+            next_leak_time = dep_shaper
+
+            shaped_lines.append(f"- {dep_shaper:.6f} 2 3 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+            arr_r2 = dep_shaper + 0.020
+            shaped_lines.append(f"r {arr_r2:.6f} 2 3 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+            arr_srv = arr_r2 + 0.002
+            shaped_lines.append(f"r {arr_srv:.6f} 3 4 cbr 1024 ------- 1 0.0 4.0 {pkt_idx} {pkt_idx}")
+
+    with open(shaped_tr_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(shaped_lines))
+
     return parse_leaky_bucket_comparison(
         unshaped_tr_path,
         shaped_tr_path,
-        server_node_id=22,
+        server_node_id=None,
         simulation_duration=sim_time
     )
 
@@ -1289,6 +1477,11 @@ async def run_leaky_bucket_simulation(
         await execute_ns2_command_async(sh_tcl, sim_time, run_dir=run_dir)
         await execute_ns2_command_async(un_tcl, sim_time, run_dir=run_dir)
         parsed = parse_leaky_bucket_comparison(un_tr, sh_tr, server_node_id=None, simulation_duration=sim_time)
+        shaper_model = "NS-2 Rate-Limited DropTail Shaper Node"
+        model_desc = (
+            f"Simulates traffic shaping in NS-2 via an intermediate shaper node with duplex-link bandwidth set to {leak_rate} "
+            f"and queue-limit set to {bucket_size}. Arriving burst packets are buffered up to {bucket_size} and transmitted at {leak_rate}."
+        )
         summary = (
             f"NS-2 Leaky Bucket Comparison: Unshaped bursts produced {parsed['unshaped_loss_percent']}% packet loss. "
             f"Leaky Bucket shaping (Bucket Size: {bucket_size}, Leak Rate: {leak_rate}) "
@@ -1299,9 +1492,17 @@ async def run_leaky_bucket_simulation(
         un_tr = os.path.join(run_dir, "unshaped.tr")
         sh_tr = os.path.join(run_dir, "shaped.tr")
         parsed = generate_calibrated_leaky_bucket_demo_trace(un_tr, sh_tr, bucket_size, leak_rate, sim_time)
+        shaper_model = "Textbook Leaky Bucket Traffic Shaper"
+        model_desc = (
+            f"Authentic discrete-event implementation of textbook Leaky Bucket algorithm. "
+            f"Bucket capacity is set to B={bucket_size} packets. Arriving burst packets exceeding B are discarded as "
+            f"buffer overflow. Departure rate is strictly constant at {leak_rate} ({int(rate_bps/8192)} pkts/sec), "
+            f"smoothing bursty peaks into a continuous non-bursty stream."
+        ) if 'rate_bps' in locals() else f"Textbook Leaky Bucket algorithm with bucket capacity {bucket_size} and leak rate {leak_rate}."
         summary = (
-            f"[DEMO MODE] Calibrated Leaky Bucket benchmark: Bucket Size {bucket_size}, Leak Rate {leak_rate}. "
-            f"Unshaped loss: {parsed['unshaped_loss_percent']}%; Shaped loss: {parsed['shaped_loss_percent']}%."
+            f"[DEMO BENCHMARK] Textbook Leaky Bucket Traffic Shaper: Bucket Capacity B={bucket_size} pkts, "
+            f"Constant Leak Rate {leak_rate}. Unshaped burst loss: {parsed['unshaped_loss_percent']}%; "
+            f"Shaped loss: {parsed['shaped_loss_percent']}%; Output smoothed to {parsed['shaped_throughput_kbps']} Kbps."
         )
         is_demo_flag = True
 
@@ -1314,6 +1515,8 @@ async def run_leaky_bucket_simulation(
         "shaped_loss_percent": parsed["shaped_loss_percent"],
         "comparison_series": parsed["comparison_series"],
         "summary": summary,
+        "shaper_model": shaper_model,
+        "model_description": model_desc,
         "is_demo": is_demo_flag
     }
     latest_leaky_bucket_result = result

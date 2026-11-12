@@ -109,7 +109,7 @@ docker-compose down
 
 ### Railway / Fly.io
 - **Railway**: Connect GitHub repo. Railway auto-detects `Dockerfile` and binds `$PORT`.
-- **Fly.io**: Run `fly launch` in project root. It will use the provided [fly.toml](file:///f:/EduNet%20Analyzer/fly.toml).
+- **Fly.io**: Run `fly launch` in project root. It will use the provided `fly.toml`.
 
 ---
 

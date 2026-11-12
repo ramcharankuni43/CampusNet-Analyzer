@@ -233,6 +233,9 @@ def test_parse_ns2_exact_formulas(tmp_path):
     lines.append("+ 0.150000 3 2 ack 40 ------- 1 3.0 0.0 1 30")
     lines.append("r 0.170000 1 0 ack 40 ------- 1 3.0 0.0 1 30")
 
+    # Add duplicate packet delivery at destination for packet 3 (tests non-duplicate throughput accounting)
+    lines.append("r 0.390000 2 3 tcp 1024 ------- 1 0.0 3.0 3 3")
+
     trace_file.write_text("\n".join(lines), encoding="utf-8")
 
     duration = 10.0
@@ -244,8 +247,9 @@ def test_parse_ns2_exact_formulas(tmp_path):
     assert res["packet_delivery_ratio"] == 90.0  # (9 / 10) * 100
     assert res["packet_loss_percent"] == 10.0  # (1 / 10) * 100
     assert res["packets_dropped"] == 2  # 2 drop events (packet 2 and packet 5)
+    assert res["duplicate_deliveries"] == 1  # Exactly 1 duplicate delivery detected without inflating throughput
 
-    # Received bytes = 9 delivered * 1024 = 9216 bytes
+    # Received bytes = 9 delivered * 1024 = 9216 bytes (duplicate delivery does NOT add 1024 bytes)
     # Expected throughput = (9216 * 8) / (10.0 * 1000) = 73.728 -> 73.73 Kbps
     expected_tp = round((9 * 1024 * 8.0) / (duration * 1000.0), 2)
     assert res["throughput_kbps"] == expected_tp
@@ -339,7 +343,7 @@ def test_simulation_results_endpoint():
     assert data["result"]["throughput_kbps"] > 0
 
 def test_app_startup_metadata():
-    assert app.title == "EduNet Analyzer API"
+    assert app.title == "CampusNet-Analyzer API"
     paths = app.openapi()["paths"]
     assert "/api/health" in paths
     assert "/api/dashboard/summary" in paths

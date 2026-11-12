@@ -122,8 +122,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
           <div className="flex items-center gap-3">
             <AppLogo className="w-9 h-9 shadow-sm shadow-blue-200 flex-shrink-0" />
             <div>
-              <h1 className="font-bold text-sm text-[#0F172A] tracking-tight leading-none">EduNet Analyzer</h1>
-              <p className="text-[10px] text-[#64748B] mt-1 font-medium">E-Learning Network Lab</p>
+              <h1 className="font-bold text-sm text-[#0F172A] tracking-tight leading-none">CampusNet-Analyzer</h1>
+              <p className="text-[10px] text-[#64748B] mt-1 font-medium">University Network Lab</p>
             </div>
           </div>
           {isMobile && onClose && (

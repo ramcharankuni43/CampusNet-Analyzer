@@ -542,7 +542,7 @@ Outputs comma-delimited columns for ingestion into MATLAB, Python Pandas, or Mic
 │             └───────────────► REST / WS ◄──────────┘                   │
 │                                                    │                   │
 │                                           Path Translation             │
-│                                           F:\... -> /mnt/f/...         │
+│                                           to_wsl_path (e.g. /mnt/...)  │
 │                                                    │                   │
 ├────────────────────────────────────────────────────┼───────────────────┤
 │                                                    ▼                   │
