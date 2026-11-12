@@ -133,6 +133,61 @@ def to_wsl_path(win_path: str) -> str:
     return clean
 
 _cached_ns_info: Optional[Dict[str, Any]] = None
+_cached_wsl_info: Optional[Dict[str, Any]] = None
+
+def check_wsl_status(refresh: bool = False) -> Dict[str, Any]:
+    """
+    Checks if Windows Subsystem for Linux (WSL) is installed and operational.
+    Does NOT report True just because wsl.exe stub binary exists in C:\\Windows\\System32.
+    """
+    global _cached_wsl_info
+    if not refresh and _cached_wsl_info is not None:
+        return _cached_wsl_info
+
+    wsl_exe = shutil.which("wsl")
+    if not wsl_exe:
+        _cached_wsl_info = {
+            "wsl_installed": False,
+            "distros": [],
+            "ubuntu_detected": False,
+            "message": "wsl.exe not found on system PATH"
+        }
+        return _cached_wsl_info
+
+    try:
+        res = subprocess.run(["wsl.exe", "-l", "-q"], capture_output=True, timeout=5)
+        raw = res.stdout or res.stderr
+        try:
+            text = raw.decode("utf-16-le").strip()
+        except Exception:
+            text = raw.decode("utf-8", errors="ignore").strip()
+
+        if res.returncode != 0:
+            _cached_wsl_info = {
+                "wsl_installed": False,
+                "distros": [],
+                "ubuntu_detected": False,
+                "message": text or "The Windows Subsystem for Linux is not installed."
+            }
+            return _cached_wsl_info
+
+        lines = [line.strip().replace("\x00", "") for line in text.splitlines() if line.strip()]
+        has_ubuntu = any("ubuntu" in d.lower() for d in lines)
+        _cached_wsl_info = {
+            "wsl_installed": True,
+            "distros": lines,
+            "ubuntu_detected": has_ubuntu,
+            "message": f"WSL active with distributions: {', '.join(lines) if lines else 'None registered'}"
+        }
+        return _cached_wsl_info
+    except Exception as e:
+        _cached_wsl_info = {
+            "wsl_installed": False,
+            "distros": [],
+            "ubuntu_detected": False,
+            "message": str(e)
+        }
+        return _cached_wsl_info
 
 def check_ns2_installation(refresh: bool = False) -> Dict[str, Any]:
     """Check if NS-2 is available natively or inside WSL."""
@@ -143,19 +198,30 @@ def check_ns2_installation(refresh: bool = False) -> Dict[str, Any]:
     # 1. Native check
     native_ns = shutil.which("ns")
     if native_ns:
+        try:
+            res = subprocess.run([native_ns, "-version"], capture_output=True, text=True, timeout=5)
+            version_str = res.stdout.strip() or res.stderr.strip() or "2.x"
+        except Exception:
+            version_str = "unknown"
         _cached_ns_info = {
             "installed": True,
             "mode": "native",
             "path": native_ns,
-            "cmd": ["ns"],
+            "cmd": [native_ns],
             "distro": None,
-            "diagnostic": f"Native NS-2 executable found at {native_ns}"
+            "version": version_str,
+            "diagnostic": f"Native NS-2 executable found at {native_ns} (version: {version_str})"
         }
         return _cached_ns_info
 
-    # 2. WSL check
-    wsl = shutil.which("wsl")
-    if wsl:
+    # 2. WSL check (only if WSL is genuinely installed and functional)
+    wsl_status = check_wsl_status(refresh=refresh)
+    if wsl_status["wsl_installed"]:
+        candidate_distros = ["Ubuntu", "Ubuntu-24.04", "Ubuntu-22.04", "Ubuntu-20.04", "Debian"]
+        for d in wsl_status.get("distros", []):
+            if d not in candidate_distros:
+                candidate_distros.append(d)
+
         # Check default WSL distro first
         try:
             res = subprocess.run(
@@ -177,26 +243,27 @@ def check_ns2_installation(refresh: bool = False) -> Dict[str, Any]:
         except Exception:
             pass
 
-        # Check Ubuntu distro explicitly
-        try:
-            res = subprocess.run(
-                ["wsl", "-d", "Ubuntu", "--", "which", "ns"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                _cached_ns_info = {
-                    "installed": True,
-                    "mode": "wsl",
-                    "path": res.stdout.strip(),
-                    "cmd": ["wsl", "-d", "Ubuntu", "--", "ns"],
-                    "distro": "Ubuntu",
-                    "diagnostic": f"NS-2 detected in WSL2 Ubuntu distro at {res.stdout.strip()}"
-                }
-                return _cached_ns_info
-        except Exception:
-            pass
+        # Check candidate distros explicitly
+        for distro in candidate_distros:
+            try:
+                res = subprocess.run(
+                    ["wsl", "-d", distro, "--", "which", "ns"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    _cached_ns_info = {
+                        "installed": True,
+                        "mode": "wsl",
+                        "path": res.stdout.strip(),
+                        "cmd": ["wsl", "-d", distro, "--", "ns"],
+                        "distro": distro,
+                        "diagnostic": f"NS-2 detected in WSL2 {distro} distro at {res.stdout.strip()}"
+                    }
+                    return _cached_ns_info
+            except Exception:
+                continue
 
     _cached_ns_info = {
         "installed": False,
