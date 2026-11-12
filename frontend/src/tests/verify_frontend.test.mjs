@@ -399,5 +399,80 @@ describe('Frontend Verification Test Suite', () => {
       assert.ok(errResponse.detail.includes('WSL2'));
     });
   });
+
+  describe('9. Performance Analysis User Scaling & Authentic Data Verification', () => {
+    // Reproduction of userScalingData transformation logic from PerformanceAnalysis.tsx
+    function deriveCohortMetrics(userCounts, experiments) {
+      return userCounts.map((count) => {
+        const matches = experiments.filter((e) => e.users === count);
+        const tcpMatch = matches.find((e) => e.protocol?.toUpperCase() === 'TCP') || matches[0];
+
+        if (tcpMatch && tcpMatch.result) {
+          return {
+            hasData: true,
+            users: `${count} Users`,
+            userCount: count,
+            throughput: tcpMatch.result.throughput_kbps,
+            loss: tcpMatch.result.packet_loss_percent,
+            delay: tcpMatch.result.average_delay_ms,
+            pdr: tcpMatch.result.packet_delivery_ratio,
+            code: tcpMatch.exp_code,
+            protocol: tcpMatch.protocol
+          };
+        }
+
+        return {
+          hasData: false,
+          users: `${count} Users`,
+          userCount: count
+        };
+      });
+    }
+
+    it('extracts verified metrics for available cohorts without synthetic fallback', () => {
+      const testExps = [
+        {
+          id: 1,
+          exp_code: 'EXP-001',
+          users: 10,
+          protocol: 'TCP',
+          status: 'COMPLETED',
+          result: { throughput_kbps: 820.5, packet_loss_percent: 0.1, average_delay_ms: 27.2, packet_delivery_ratio: 99.9 }
+        },
+        {
+          id: 3,
+          exp_code: 'EXP-003',
+          users: 50,
+          protocol: 'TCP',
+          status: 'COMPLETED',
+          result: { throughput_kbps: 940.2, packet_loss_percent: 2.5, average_delay_ms: 55.4, packet_delivery_ratio: 97.5 }
+        }
+      ];
+
+      const cohorts = deriveCohortMetrics([10, 25, 50, 100, 200], testExps);
+
+      // 10 Users cohort must have data
+      const c10 = cohorts.find(c => c.userCount === 10);
+      assert.equal(c10.hasData, true);
+      assert.equal(c10.throughput, 820.5);
+      assert.equal(c10.code, 'EXP-001');
+
+      // 50 Users cohort must have data
+      const c50 = cohorts.find(c => c.userCount === 50);
+      assert.equal(c50.hasData, true);
+      assert.equal(c50.throughput, 940.2);
+
+      // 200 Users cohort has no experiment -> hasData MUST be false, no synthetic numbers
+      const c200 = cohorts.find(c => c.userCount === 200);
+      assert.equal(c200.hasData, false);
+      assert.equal(c200.throughput, undefined);
+      assert.equal(c200.loss, undefined);
+
+      // Valid chart data must strictly filter out cohorts with hasData == false
+      const validCharts = cohorts.filter(c => c.hasData);
+      assert.equal(validCharts.length, 2);
+      assert.deepEqual(validCharts.map(c => c.userCount), [10, 50]);
+    });
+  });
 });
 

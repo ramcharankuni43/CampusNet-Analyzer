@@ -1,5 +1,5 @@
 /**
- * WebSocket Client Service for EduNet Analyzer
+ * WebSocket Client Service for CampusNet Analyzer
  * Provides real-time streaming for simulation progress, stage transitions, and telemetry.
  */
 

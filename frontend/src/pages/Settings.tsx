@@ -157,7 +157,7 @@ export const Settings: React.FC = () => {
         </div>
 
         <p className="text-xs text-slate-600 leading-relaxed">
-          If you are on Windows and wish to run native NS-2 simulations in <strong>Real-Time Mode</strong>, you can install NS-2 inside WSL Ubuntu. EduNet Analyzer automatically detects and invokes <code>wsl -d Ubuntu -- ns</code>.
+          If you are on Windows and wish to run native NS-2 simulations in <strong>Real-Time Mode</strong>, you can install NS-2 inside WSL Ubuntu. CampusNet Analyzer automatically detects and invokes <code>wsl -d Ubuntu -- ns</code>.
         </p>
 
         <div className="space-y-2">

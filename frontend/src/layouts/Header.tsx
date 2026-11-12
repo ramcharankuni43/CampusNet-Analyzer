@@ -46,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       default:
         if (location.pathname.startsWith('/experiments/')) return 'Experiment Results';
         if (location.pathname.startsWith('/simulation/')) return 'Simulation Monitor';
-        return 'EduNet Analyzer';
+        return 'CampusNet Analyzer';
     }
   };
 

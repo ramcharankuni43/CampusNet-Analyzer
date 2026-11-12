@@ -44,11 +44,11 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         if db.query(Experiment).count() == 0:
-            print("[EduNet Analyzer] First run detected: Seeding academic laboratory baseline experiments...")
+            print("[CampusNet Analyzer] First run detected: Seeding academic laboratory baseline experiments...")
             seed_database(db, force=False)
-            print("[EduNet Analyzer] Database seeded successfully.")
+            print("[CampusNet Analyzer] Database seeded successfully.")
     except Exception as e:
-        print(f"[EduNet Analyzer] Warning during database seeding: {e}")
+        print(f"[CampusNet Analyzer] Warning during database seeding: {e}")
     finally:
         db.close()
     
@@ -191,5 +191,5 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    print(f"[EduNet Analyzer] Starting server on http://{host}:{port}")
+    print(f"[CampusNet Analyzer] Starting server on http://{host}:{port}")
     uvicorn.run(app, host=host, port=port)

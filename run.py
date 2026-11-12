@@ -1,5 +1,5 @@
 """
-EduNet Analyzer - Root Application Launcher
+CampusNet Analyzer - Root Application Launcher
 Provides standardized startup command: python run.py
 """
 import os
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
     print(f"==================================================")
-    print(f"  EduNet Analyzer - Network Simulation Engine")
+    print(f"  CampusNet Analyzer - Network Simulation Engine")
     print(f"  Listening on: http://{host}:{port}")
     print(f"==================================================")
     uvicorn.run(app, host=host, port=port)

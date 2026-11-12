@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌐 EduNet Analyzer
+# 🌐 CampusNet Analyzer
 ### Network Performance Analysis of a University E-Learning System
 #### NS-2 Discrete-Event Telemetry & Protocol Engineering Suite
 
@@ -32,7 +32,7 @@
 
 A university provides online classes, video lectures, a Learning Management System (LMS), a student portal, and an examination portal. A large number of students accessing these services simultaneously generates heavy network traffic and causes congestion, packet loss, queuing delay, and reduced throughput. 
 
-**EduNet Analyzer** models and evaluates the effect of user load and traffic conditions on university e-learning communication using actual discrete-event **NS-2 (Network Simulator 2)** runs executed through WSL2 Ubuntu on Windows localhost.
+**CampusNet Analyzer** models and evaluates the effect of user load and traffic conditions on university e-learning communication using actual discrete-event **NS-2 (Network Simulator 2)** runs executed through WSL2 Ubuntu on Windows localhost.
 
 ---
 
@@ -127,7 +127,7 @@ Evaluated across standard campus bandwidth allocations:
 
 ### 2. Leaky Bucket Traffic Shaper
 - **Viva Defense Question**: *NS-2 has no built-in leaky bucket queue. How is it implemented, and why not use RED?*
-- **Accredited NS-2 Mapping**: Random Early Detection (RED) is an active queue management scheme for congestion avoidance, *not* a traffic shaper. In EduNet Analyzer, Leaky Bucket is implemented via an **intermediate shaper node with a bounded `DropTail` queue** (limit = bucket capacity) drained at a **constant leak rate link** (e.g., 512 Kbps).
+- **Accredited NS-2 Mapping**: Random Early Detection (RED) is an active queue management scheme for congestion avoidance, *not* a traffic shaper. In CampusNet Analyzer, Leaky Bucket is implemented via an **intermediate shaper node with a bounded `DropTail` queue** (limit = bucket capacity) drained at a **constant leak rate link** (e.g., 512 Kbps).
 - **Mechanics**:
   1. Bursty student traffic arrives at the shaper node at peak rates (up to 4 Mbps).
   2. Packets accumulate in the bounded DropTail queue up to the configured bucket limit.

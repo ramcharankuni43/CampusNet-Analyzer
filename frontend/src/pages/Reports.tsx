@@ -48,7 +48,7 @@ export const Reports: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-[#0F172A]">
-                {isDemo ? 'EduNet Analyzer: Demo Experiment Report Hub' : 'EduNet Analyzer: NS-2 Network Performance Report Hub'}
+                {isDemo ? 'CampusNet Analyzer: Demo Experiment Report Hub' : 'CampusNet Analyzer: NS-2 Network Performance Report Hub'}
               </h2>
               <ModeBadge isDemo={isDemo} />
             </div>
