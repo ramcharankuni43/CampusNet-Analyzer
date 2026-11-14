@@ -180,3 +180,4 @@ npm --prefix frontend run build
 | **Stage 1: Repository Assessment & Migration Plan** | **Complete** | Completed and audited. |
 | **Stage 2: Python + SimPy Simulation Engine** | **COMPLETE & FULLY VERIFIED** | Core engine, 5 traffic scenarios, UDP/TCP-like/GBN protocols, Leaky Bucket shaper, independent conservation, and metric formulas verified. All 21 SimPy unit tests pass. |
 | **Stage 3: FastAPI Backend & SQLite Integration** | **READY TO PROCEED** | Awaiting user instruction to begin Stage 3 API and database wiring. |
+
