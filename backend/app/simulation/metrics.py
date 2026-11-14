@@ -22,6 +22,7 @@ def calculate_metrics(
     recorder: EventRecorder,
     simulation_duration: float,
     data_rate_bps: float = 1_000_000.0,
+    actual_duration: Optional[float] = None,
     experiment_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
@@ -29,6 +30,7 @@ def calculate_metrics(
     Handles edge conditions (e.g., zero packets) cleanly without division by zero.
     """
     sim_time = max(float(simulation_duration), 0.001)
+    elapsed_time = max(sim_time, float(actual_duration)) if actual_duration is not None else sim_time
 
     sent_unique = len(recorder.unique_generated)
     delivered_unique = len(recorder.unique_delivered)
@@ -36,13 +38,13 @@ def calculate_metrics(
     in_transit_unique = len(recorder.unique_in_transit)
     total_drop_events = len(recorder.dropped_packets)
 
-    # 1. Throughput (Goodput) in Kbps: based on unique delivered payload bytes
+    # 1. Throughput (Goodput) in Kbps: based on unique delivered payload bytes over active elapsed simulation time
     # (Bytes * 8 bits/byte) / (seconds * 1000 bits/Kb)
-    throughput_kbps = round((recorder.total_delivered_bytes * 8.0) / (sim_time * 1000.0), 2)
+    throughput_kbps = round((recorder.total_delivered_bytes * 8.0) / (elapsed_time * 1000.0), 2)
 
-    # Physical Link Throughput (including retransmissions):
+    # Physical Link Throughput (bytes that physically traversed serialization over active elapsed time):
     link_transmitted_bytes = recorder.total_link_transmitted_bytes
-    link_throughput_kbps = round((link_transmitted_bytes * 8.0) / (sim_time * 1000.0), 2)
+    link_throughput_kbps = round((link_transmitted_bytes * 8.0) / (elapsed_time * 1000.0), 2)
 
     # 2. Packet Delivery Ratio (PDR %) and Packet Loss (%)
     # Calculated against unique generated packets
@@ -139,6 +141,7 @@ def calculate_metrics(
         "link_throughput_kbps": link_throughput_kbps,
         "total_delivered_bytes": recorder.total_delivered_bytes,
         "total_link_transmitted_bytes": link_transmitted_bytes,
+        "total_offered_bytes": recorder.total_offered_bytes,
         "packet_loss_percent": packet_loss_percent,
         "packet_delivery_ratio": pdr_percent,
         "average_delay_ms": avg_delay_ms,
@@ -154,6 +157,7 @@ def calculate_metrics(
         "total_transmissions": recorder.total_transmissions,
         "data_rate_kbps": data_rate_kbps,
         "simulation_duration": sim_time,
+        "actual_duration": round(elapsed_time, 4),
         "time_series": time_series,
         "conservation_passed": conservation_passed,
         "conservation_audit": conservation_diag,

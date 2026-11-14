@@ -224,7 +224,8 @@ class SimPySimulationEngine:
         metrics = calculate_metrics(
             recorder=self.recorder,
             simulation_duration=self.simulation_duration,
-            data_rate_bps=self.bandwidth_bps
+            data_rate_bps=self.bandwidth_bps,
+            actual_duration=self.env.now
         )
 
         if self.leaky_bucket:

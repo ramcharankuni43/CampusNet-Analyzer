@@ -676,3 +676,98 @@ def test_engine_leaky_bucket_integration():
     assert res["conservation_passed"] is True
 
 
+def test_retransmission_after_temporary_failure_lifecycle():
+    """
+    Directly tests the packet lifecycle state machine when a temporary transmission
+    attempt fails and is subsequently recovered by retransmission:
+    - Verifies attempt drops are counted in dropped_packets (events) but not in terminal unique_dropped.
+    - Verifies retransmission does NOT create a new unique generated packet.
+    - Verifies delivered packet is counted exactly once with no double-counted bytes.
+    - Verifies delivered and dropped sets are completely disjoint.
+    - Verifies every packet has exactly ONE terminal state.
+    """
+    rec = EventRecorder()
+    p1 = Packet(packet_id=1, seq_num=1, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
+
+    # 1. Generation
+    rec.record_generate(p1, 0.0)
+    assert rec.packet_states[p1.unique_key] == "IN_TRANSIT"
+    assert len(rec.unique_generated) == 1
+    assert rec.total_transmissions == 1
+
+    # 2. Transmission attempt 1 fails (dropped at queue buffer)
+    rec.record_drop(p1, "queue_overflow", 0.010)
+    assert rec.packet_states[p1.unique_key] == "DROPPED"
+    assert len(rec.dropped_packets) == 1
+    assert len(rec.unique_dropped) == 1
+    assert len(rec.unique_delivered) == 0
+
+    # 3. Retransmission attempt (shares same unique key, is_retransmit=True)
+    p1_retx = Packet(packet_id=2, seq_num=1, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0, is_retransmit=True)
+    rec.record_generate(p1_retx, 0.030)
+    assert rec.packet_states[p1.unique_key] == "IN_TRANSIT"
+    assert len(rec.unique_generated) == 1, "Retransmission must not increment unique generated count"
+    assert rec.retransmissions_count == 1
+    assert rec.total_transmissions == 2
+
+    # 4. Transmission attempt 2 succeeds (delivered and accepted at application)
+    rec.record_receive(p1_retx, 0.045)
+    assert rec.packet_states[p1.unique_key] == "DELIVERED"
+    assert len(rec.delivered_packets) == 1
+    assert rec.total_delivered_bytes == 1000, "Delivered bytes must not be inflated"
+    assert len(rec.packet_delays) == 1
+
+    # 5. Spurious duplicate delivery attempt (e.g. delayed duplicate link arrival)
+    rec.record_receive(p1_retx, 0.060)
+    assert len(rec.delivered_packets) == 1, "Duplicate arrival must not increment unique delivered count"
+    assert rec.total_delivered_bytes == 1000, "Duplicate arrival must not double-count bytes"
+    assert len(rec.packet_delays) == 1, "Duplicate arrival must not distort delay measurements"
+
+    # 6. Conservation & Invariant Audits
+    passed, diag = rec.verify_conservation()
+    assert passed is True
+    assert diag["total_unique_generated"] == 1
+    assert diag["unique_delivered"] == 1
+    assert diag["unique_dropped"] == 0
+    assert diag["unique_in_transit"] == 0
+    assert len(diag["deliv_drop_overlap"]) == 0
+    assert len(diag["deliv_transit_overlap"]) == 0
+    assert len(diag["drop_transit_overlap"]) == 0
+
+    metrics = calculate_metrics(rec, simulation_duration=1.0, data_rate_bps=1_000_000.0)
+    assert metrics["packets_sent"] == 1
+    assert metrics["packets_received"] == 1
+    assert metrics["packets_dropped"] == 1          # 1 physical drop event occurred
+    assert metrics["unique_dropped_packets"] == 0   # 0 terminal unrecovered drops
+    assert metrics["lost_packets"] == 0
+    assert metrics["retransmissions"] == 1
+    assert metrics["packet_delivery_ratio"] == 100.0
+    assert metrics["packet_loss_percent"] == 0.0
+
+
+def test_link_throughput_never_exceeds_bandwidth_capacity():
+    """
+    Verifies that physical link throughput over active elapsed time never exceeds
+    the configured link bandwidth capacity, even under intense saturating TCP workloads.
+    """
+    for bw_str, bw_bps in [("1 Mbps", 1_000_000.0), ("5 Mbps", 5_000_000.0), ("10 Mbps", 10_000_000.0)]:
+        engine = SimPySimulationEngine(
+            num_students=12,
+            protocol="TCP",
+            bandwidth=bw_str,
+            delay="15ms",
+            queue_capacity=10, # Small queue to induce heavy congestion and drops
+            simulation_duration=2.0,
+            seed=100
+        )
+        res = engine.run()
+        max_allowed_kbps = bw_bps / 1000.0
+        assert res["link_throughput_kbps"] <= max_allowed_kbps, (
+            f"Link throughput {res['link_throughput_kbps']} Kbps exceeded physical capacity {max_allowed_kbps} Kbps"
+        )
+        assert res["throughput_kbps"] <= max_allowed_kbps, (
+            f"Goodput {res['throughput_kbps']} Kbps exceeded physical capacity {max_allowed_kbps} Kbps"
+        )
+
+
+

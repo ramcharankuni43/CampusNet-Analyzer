@@ -51,6 +51,7 @@ class EventRecorder:
         self.total_generated_bytes: int = 0
         self.total_delivered_bytes: int = 0
         self.total_dropped_bytes: int = 0
+        self.total_offered_bytes: int = 0
         self.total_link_transmitted_bytes: int = 0
 
         # Delay tracking (seconds) for unique delivered packets
@@ -73,7 +74,7 @@ class EventRecorder:
                 self.packet_states[key] = STATE_IN_TRANSIT
 
         self.total_transmissions += 1
-        self.total_link_transmitted_bytes += pkt.size_bytes
+        self.total_offered_bytes += pkt.size_bytes
 
         self.events.append(SimulationEvent(
             time=time,
@@ -105,6 +106,7 @@ class EventRecorder:
 
     def record_dequeue(self, pkt: Packet, time: float, queue_len: int):
         """Records packet exit from queue to enter physical serialization."""
+        self.total_link_transmitted_bytes += pkt.size_bytes
         self.events.append(SimulationEvent(
             time=time,
             event_type="dequeue",
