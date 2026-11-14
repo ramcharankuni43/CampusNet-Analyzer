@@ -13,6 +13,7 @@ from .traffic import get_scenario_config
 from .protocols.udp import UdpAgent
 from .protocols.tcp_like import TcpLikeAgent
 from .protocols.gbn import GoBackNAgent
+from .protocols.leaky_bucket import LeakyBucketQueue
 from .metrics import calculate_metrics
 
 
@@ -70,6 +71,9 @@ class SimPySimulationEngine:
         traffic_intensity: str = "Medium",
         loss_rate: float = 0.0,
         window_size: int = 32,
+        enable_leaky_bucket: bool = False,
+        bucket_capacity_bytes: int = 50000,
+        leak_rate: Any = None,
         seed: Optional[int] = 42
     ):
         self.num_students = max(1, min(int(num_students), 250))
@@ -83,6 +87,11 @@ class SimPySimulationEngine:
         self.loss_rate = max(0.0, min(1.0, float(loss_rate)))
         self.window_size = max(1, min(int(window_size), 256))
         self.seed = seed
+
+        # Leaky Bucket Traffic Shaper configuration
+        self.enable_leaky_bucket = enable_leaky_bucket or ("leaky" in str(scenario_name).lower())
+        self.bucket_capacity_bytes = max(1024, int(bucket_capacity_bytes))
+        self.leak_rate_bps = parse_bandwidth_bps(leak_rate) if leak_rate is not None else self.bandwidth_bps
 
         # SimPy core environment
         self.env = simpy.Environment()
@@ -102,11 +111,26 @@ class SimPySimulationEngine:
             rng=self.rng
         )
 
+        # Attach Leaky Bucket Shaper before bottleneck link if enabled
+        if self.enable_leaky_bucket:
+            self.leaky_bucket: Optional[LeakyBucketQueue] = LeakyBucketQueue(
+                env=self.env,
+                capacity_bytes=self.bucket_capacity_bytes,
+                leak_rate_bps=self.leak_rate_bps,
+                downstream_link=self.topology.bottleneck_link,
+                recorder=self.recorder
+            )
+        else:
+            self.leaky_bucket = None
+
         self.agents = []
 
     def _setup_agents(self):
         """Initializes and attaches protocol sender agents for each student node."""
         cfg = get_scenario_config(self.scenario_name, self.traffic_intensity)
+
+        # Connect sender agents either directly to the bottleneck link or through the Leaky Bucket shaper
+        fwd_link = self.leaky_bucket if self.enable_leaky_bucket else self.topology.bottleneck_link
 
         for student_id in range(self.num_students):
             student_rng = random.Random(self.seed + student_id if self.seed else None)
@@ -116,7 +140,7 @@ class SimPySimulationEngine:
                     env=self.env,
                     src_node=student_id,
                     dst_node=self.topology.server_node_id,
-                    link=self.topology.bottleneck_link,
+                    link=fwd_link,
                     recorder=self.recorder,
                     traffic_config=cfg,
                     packet_id_counter=self.packet_id_counter,
@@ -128,7 +152,7 @@ class SimPySimulationEngine:
                     env=self.env,
                     src_node=student_id,
                     dst_node=self.topology.server_node_id,
-                    forward_link=self.topology.bottleneck_link,
+                    forward_link=fwd_link,
                     return_link=self.topology.ack_link,
                     recorder=self.recorder,
                     packet_id_counter=self.packet_id_counter,
@@ -145,7 +169,7 @@ class SimPySimulationEngine:
                     env=self.env,
                     src_node=student_id,
                     dst_node=self.topology.server_node_id,
-                    forward_link=self.topology.bottleneck_link,
+                    forward_link=fwd_link,
                     return_link=self.topology.ack_link,
                     recorder=self.recorder,
                     traffic_config=cfg,
@@ -174,10 +198,17 @@ class SimPySimulationEngine:
         # Phase 1: Run traffic generation up to simulation_duration
         self.env.run(until=self.simulation_duration)
 
-        # Phase 2: Controlled drain of active transmission queue
+        # Phase 2: Controlled drain of active transmission queue and shaper
         drain_limit = self.simulation_duration + max(0.5, self.delay_sec * 20.0)
         link = self.topology.bottleneck_link
-        while (len(link.tx_resource.queue) > 0 or link.tx_resource.count > 0) and self.env.now < drain_limit:
+
+        def is_busy():
+            q_busy = len(link.tx_resource.queue) > 0 or link.tx_resource.count > 0
+            if self.leaky_bucket and (len(self.leaky_bucket.buffer) > 0 or self.leaky_bucket.current_bytes > 0):
+                return True
+            return q_busy
+
+        while is_busy() and self.env.now < drain_limit:
             try:
                 self.env.step()
             except simpy.core.EmptySchedule:
@@ -195,5 +226,8 @@ class SimPySimulationEngine:
             simulation_duration=self.simulation_duration,
             data_rate_bps=self.bandwidth_bps
         )
+
+        if self.leaky_bucket:
+            metrics["shaper_statistics"] = self.leaky_bucket.get_statistics()
 
         return metrics

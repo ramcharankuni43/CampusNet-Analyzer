@@ -114,7 +114,9 @@ class GoBackNAgent:
         def on_delivered(p: Packet):
             # Receiver side: check if this is the expected in-order packet
             if p.seq_num == self.expectedseqnum:
-                # In-order packet accepted
+                # In-order packet accepted at application layer
+                if self.recorder:
+                    self.recorder.record_receive(p, env.now, len(self.forward_link.tx_resource.queue))
                 self.expectedseqnum += 1
                 # Send cumulative ACK for (expectedseqnum - 1)
                 env.process(self._send_cumulative_ack(self.expectedseqnum - 1))

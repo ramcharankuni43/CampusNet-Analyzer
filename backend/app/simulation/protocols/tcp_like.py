@@ -1,20 +1,22 @@
 """
 CampusNet Analyzer - Simplified TCP-like Protocol Agent
-Implements Sliding Window Flow Control and AIMD Congestion Control.
+Implements Pedagogical Sliding Window Flow Control and AIMD Congestion Control.
 
-Educational Model Assumptions & Design:
-- Maintains a Congestion Window (cwnd) measured in whole packets.
-- Slow Start: cwnd increases by 1 for every ACK received while cwnd < ssthresh.
-- Congestion Avoidance (Additive Increase): cwnd increases by (1 / cwnd) per ACK.
-- Multiplicative Decrease: Upon packet loss / drop, ssthresh is set to max(2, cwnd // 2),
-  and cwnd is reduced to 1 packet (or ssthresh in fast recovery).
-- Transmission limit: Number of unacknowledged in-flight packets cannot exceed min(cwnd, max_window).
-- Retransmissions are flagged with is_retransmit=True and share the original (src_node, seq_num)
-  unique key so they are not double-counted as newly generated data.
+Educational Model Assumptions & Deliberate Simplifications:
+- cwnd is measured in whole packets (segments) rather than raw byte counts.
+- Additive Increase: cwnd increases by 1.0 packet per RTT in congestion avoidance
+  (approximated by +1/cwnd per in-order ACK).
+- Multiplicative Decrease: Upon detected loss, ssthresh is set to max(2, cwnd / 2)
+  and cwnd drops to 1 packet (Slow Start Restart).
+- Bounded Window: cwnd is strictly clamped to max_window to emulate receiver advertised window (rwnd).
+- Retransmissions preserve the original unique key (src_node, seq_num) with is_retransmit=True.
+- Simplification Note: This model is designed for educational discrete-event demonstration of
+  AIMD principles. It does not implement full RFC 793/5681 complexities (such as Karn-Partridge
+  RTT filtering, Jacobson-Karels dynamic RTO variance, Selective ACK (SACK), or ECN marking).
 """
 import random
 import simpy
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import Optional, Dict, Set, TYPE_CHECKING
 from .base import Packet
 from ..topology import NetworkLink
 from ..traffic import TrafficScenarioConfig
@@ -66,6 +68,10 @@ class TcpLikeAgent:
         self.in_flight: Dict[int, Packet] = {}
         # Send times for RTO tracking
         self.send_times: Dict[int, float] = {}
+        # Guard set against duplicate concurrent retransmissions
+        self.retransmitting: Set[int] = set()
+        # Cumulative ACK tracker to ignore duplicate/stale ACKs for cwnd growth
+        self.last_ack: int = 0
 
         # SimPy notification event when ACKs arrive or window opens
         self.window_opened = env.event()
@@ -117,7 +123,10 @@ class TcpLikeAgent:
         env = self.env
 
         def on_delivered(p: Packet):
-            # Destination LMS server receives packet and emits an ACK
+            # Destination LMS server accepts packet at application layer
+            if self.recorder:
+                self.recorder.record_receive(p, env.now, len(self.forward_link.tx_resource.queue))
+            # Destination LMS server emits an ACK back to sender
             env.process(self._send_ack(p.seq_num))
 
         def on_dropped(p: Packet, reason: str):
@@ -157,16 +166,23 @@ class TcpLikeAgent:
             del self.in_flight[ack_seq]
         if ack_seq in self.send_times:
             del self.send_times[ack_seq]
+        self.retransmitting.discard(ack_seq)
 
         self.recorder.record_ack(ack_seq, self.dst_node, self.src_node, self.env.now)
 
-        # AIMD Congestion Control Update
-        if self.cwnd < self.ssthresh:
-            # Slow Start: Exponential growth (+1 per ACK)
-            self.cwnd += 1.0
-        else:
-            # Congestion Avoidance: Linear growth (+1 / cwnd per ACK)
-            self.cwnd += (1.0 / max(1.0, self.cwnd))
+        # Only update cwnd on NEW cumulative/in-order ACKs (prevent duplicate ACK window inflation)
+        if ack_seq > self.last_ack:
+            self.last_ack = ack_seq
+            # AIMD Congestion Control Update
+            if self.cwnd < self.ssthresh:
+                # Slow Start: Exponential growth (+1 per ACK)
+                self.cwnd += 1.0
+            else:
+                # Congestion Avoidance: Linear growth (+1 / cwnd per ACK)
+                self.cwnd += (1.0 / max(1.0, self.cwnd))
+
+            # Strictly clamp cwnd to maximum configured window size
+            self.cwnd = min(self.cwnd, float(self.max_window))
 
         # Notify waiting sender process that window opened
         if not self.window_opened.triggered:
@@ -179,7 +195,8 @@ class TcpLikeAgent:
         # Drop cwnd to 1 (Slow Start Restart)
         self.cwnd = 1.0
 
-        if dropped_seq in self.in_flight:
+        if dropped_seq in self.in_flight and dropped_seq not in self.retransmitting:
+            self.retransmitting.add(dropped_seq)
             orig_pkt = self.in_flight[dropped_seq]
             # Schedule retransmission
             self.env.process(self._retransmit_packet(orig_pkt))
@@ -187,6 +204,12 @@ class TcpLikeAgent:
     def _retransmit_packet(self, orig_pkt: Packet):
         """Retransmits an unacknowledged packet with is_retransmit=True."""
         yield self.env.timeout(0.010) # Short backoff before retransmit
+
+        seq = orig_pkt.seq_num
+        # If packet was acknowledged during backoff, abort retransmission
+        if seq not in self.in_flight:
+            self.retransmitting.discard(seq)
+            return
 
         self.packet_id_counter[0] += 1
         retx_pkt = Packet(
@@ -202,6 +225,7 @@ class TcpLikeAgent:
         )
 
         self.send_times[orig_pkt.seq_num] = self.env.now
+        self.retransmitting.discard(seq)
         self.recorder.record_generate(retx_pkt, self.env.now, len(self.forward_link.tx_resource.queue))
         yield from self._transmit_and_handle_feedback(retx_pkt)
 
@@ -213,7 +237,7 @@ class TcpLikeAgent:
             now = env.now
             timed_out = [
                 seq for seq, send_t in self.send_times.items()
-                if (now - send_t) > self.rto_timeout
+                if (now - send_t) > self.rto_timeout and seq not in self.retransmitting
             ]
             for seq in timed_out:
                 self._handle_loss(seq)

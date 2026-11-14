@@ -33,12 +33,16 @@ def calculate_metrics(
     sent_unique = len(recorder.unique_generated)
     delivered_unique = len(recorder.unique_delivered)
     dropped_unique = len(recorder.unique_dropped)
-    in_transit_unique = max(0, sent_unique - delivered_unique - dropped_unique)
+    in_transit_unique = len(recorder.unique_in_transit)
     total_drop_events = len(recorder.dropped_packets)
 
-    # 1. Throughput in Kbps
+    # 1. Throughput (Goodput) in Kbps: based on unique delivered payload bytes
     # (Bytes * 8 bits/byte) / (seconds * 1000 bits/Kb)
     throughput_kbps = round((recorder.total_delivered_bytes * 8.0) / (sim_time * 1000.0), 2)
+
+    # Physical Link Throughput (including retransmissions):
+    link_transmitted_bytes = recorder.total_link_transmitted_bytes
+    link_throughput_kbps = round((link_transmitted_bytes * 8.0) / (sim_time * 1000.0), 2)
 
     # 2. Packet Delivery Ratio (PDR %) and Packet Loss (%)
     # Calculated against unique generated packets
@@ -50,6 +54,7 @@ def calculate_metrics(
         packet_loss_percent = 0.0
 
     # 3. Delay metrics (convert SimPy seconds to milliseconds)
+    # Computed strictly over unique delivered packets
     if recorder.packet_delays:
         avg_delay_ms = round((sum(recorder.packet_delays) / len(recorder.packet_delays)) * 1000.0, 2)
         min_delay_ms = round(min(recorder.packet_delays) * 1000.0, 2)
@@ -84,7 +89,9 @@ def calculate_metrics(
         if ev.event_type in ("generate", "retransmit"):
             bucket_stats[sec]["packets_sent"] += 1
         elif ev.event_type == "receive":
-            bucket_stats[sec]["bytes_received"] += ev.size_bytes
+            # Only count first-time delivered bytes for goodput
+            if ev.reason != "duplicate_delivery":
+                bucket_stats[sec]["bytes_received"] += ev.size_bytes
             bucket_stats[sec]["packets_received"] += 1
             if ev.delay is not None:
                 bucket_stats[sec]["delay_sum"] += ev.delay
@@ -96,8 +103,15 @@ def calculate_metrics(
 
     time_series = []
     for b in bucket_stats:
+        sec = b["time"]
         sec_bytes = b["bytes_received"]
-        sec_tp = round((sec_bytes * 8.0) / 1000.0, 2)
+
+        # Calculate actual bucket duration (accurately handles fractional final second)
+        b_start = float(sec)
+        b_end = min(float(sec + 1), sim_time)
+        b_duration = max(0.001, b_end - b_start) if b_end > b_start else 1.0
+
+        sec_tp = round((sec_bytes * 8.0) / (b_duration * 1000.0), 2)
         rec_count = b["packets_received"]
         sec_delay = round((b["delay_sum"] / rec_count) * 1000.0, 2) if rec_count > 0 else 0.0
         s_count = b["packets_sent"]
@@ -117,8 +131,14 @@ def calculate_metrics(
             "queue_occupancy": avg_q
         })
 
+    # Independent mathematical conservation audit
+    conservation_passed, conservation_diag = recorder.verify_conservation()
+
     return {
         "throughput_kbps": throughput_kbps,
+        "link_throughput_kbps": link_throughput_kbps,
+        "total_delivered_bytes": recorder.total_delivered_bytes,
+        "total_link_transmitted_bytes": link_transmitted_bytes,
         "packet_loss_percent": packet_loss_percent,
         "packet_delivery_ratio": pdr_percent,
         "average_delay_ms": avg_delay_ms,
@@ -135,6 +155,8 @@ def calculate_metrics(
         "data_rate_kbps": data_rate_kbps,
         "simulation_duration": sim_time,
         "time_series": time_series,
+        "conservation_passed": conservation_passed,
+        "conservation_audit": conservation_diag,
         "summary_notes": (
             f"SimPy discrete-event simulation completed. Delivered {delivered_unique}/{sent_unique} unique packets "
             f"({pdr_percent}% PDR, {packet_loss_percent}% loss) with average end-to-end delay of {avg_delay_ms} ms."

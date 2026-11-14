@@ -209,12 +209,14 @@ def test_go_back_n_arq_retransmissions():
     Tests that dropped in-flight packets trigger timeout, cumulative ACKs,
     and Go-Back-N retransmission of outstanding frames.
     """
+    import random
     env = simpy.Environment()
     rec = EventRecorder()
     pid = [0]
 
-    # Setup forward link with 10% loss rate to induce GBN retransmissions
-    fwd_link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=rec, loss_rate=0.15)
+    # Setup forward link with 15% loss rate and deterministic seed to induce GBN retransmissions
+    rng = random.Random(42)
+    fwd_link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=rec, loss_rate=0.15, rng=rng)
     ret_link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=None, loss_rate=0.0)
 
     agent = GoBackNAgent(
@@ -229,25 +231,29 @@ def test_go_back_n_arq_retransmissions():
         window_size=4,
         timeout_duration=0.060,
         packet_size=500,
-        total_packets_to_send=40
+        total_packets_to_send=40,
+        rng=random.Random(42)
     )
     env.process(agent.run())
     env.run(until=3.0)
 
     metrics = calculate_metrics(rec, simulation_duration=3.0, data_rate_bps=1_000_000.0)
 
-    assert metrics["packets_sent"] > 0
+    assert metrics["packets_sent"] == 40, "Exactly 40 unique packets should be generated"
     assert metrics["packets_received"] > 0
-    # Because of 15% channel loss, retransmissions must have occurred
-    assert rec.retransmissions_count >= 0
+    # Because of 15% channel loss with seed 42, retransmissions must have occurred
+    assert rec.retransmissions_count > 0, "Retransmissions must occur under packet loss"
+    assert metrics["retransmissions"] == rec.retransmissions_count
     # Retransmissions must NOT inflate unique generated packets
-    assert len(rec.unique_generated) <= 40
+    assert len(rec.unique_generated) == 40
+    # Independent mathematical conservation invariant must pass
+    assert metrics["conservation_passed"] is True
 
 
 def test_leaky_bucket_traffic_shaper():
     """
-    Verifies that LeakyBucketQueue buffers burst arrivals and regulates outflow
-    to the constant leak rate.
+    Verifies that LeakyBucketQueue buffers burst arrivals, regulates outflow
+    to the constant leak rate, preserves FIFO order, and accurately tracks waiting time.
     """
     env = simpy.Environment()
     rec = EventRecorder()
@@ -263,25 +269,37 @@ def test_leaky_bucket_traffic_shaper():
     )
 
     # Inject a 5-packet burst of 1000 bytes each at time 0
-    delivered = []
     for i in range(5):
         pkt = Packet(packet_id=i+1, seq_num=i+1, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
         accepted = bucket.push(pkt)
         assert accepted is True, f"Packet {i} should be accepted within 10,000 byte bucket"
 
-    # Inject an oversized burst that exceeds capacity
+    # Peak buffer bytes should equal exactly 5000 bytes
+    assert bucket.peak_buffer_bytes == 5000
+    assert bucket.peak_buffer_packets == 5
+
+    # Inject an oversized burst that exceeds capacity (5000 + 6000 > 10000)
     overflow_pkt = Packet(packet_id=99, seq_num=99, src_node=0, dst_node=1, size_bytes=6000, gen_time=0.0)
     accepted_overflow = bucket.push(overflow_pkt)
     assert accepted_overflow is False, "Oversized burst must overflow bucket and drop"
 
-    # Run for 0.15 seconds to let bucket drain smoothly
+    # Run for 0.20 seconds to let bucket drain smoothly
     env.run(until=0.20)
 
     # Check that drops were recorded
     assert len(rec.dropped_packets) == 1
     assert rec.dropped_packets[0].packet_id == 99
-    # Check that initial packets were received
-    assert len(rec.unique_delivered) > 0
+    # Check that initial packets were all received
+    assert len(rec.unique_delivered) == 5
+    # Check queuing waiting time metrics
+    assert bucket.drained_packets_count == 5
+    assert bucket.average_waiting_time > 0.0
+    assert bucket.max_waiting_time > 0.0
+    stats = bucket.get_statistics()
+    assert stats["drained_packets"] == 5
+    assert stats["dropped_packets"] == 1
+    assert stats["peak_buffer_bytes"] == 5000
+    assert stats["average_waiting_time_ms"] > 0.0
 
 
 def test_time_series_consistency():
@@ -389,4 +407,272 @@ def test_exact_formula_calculation():
     assert metrics["throughput_kbps"] == 24.0
     # Average delay: (20ms + 40ms + 80ms) / 3 = 46.67 ms
     assert metrics["average_delay_ms"] == 46.67
+
+
+def test_gbn_in_order_acceptance_and_out_of_order_discard():
+    """
+    Verifies that GoBackNAgent only accepts in-order packets,
+    discards out-of-order packets with reason 'gbn_out_of_order',
+    and retransmissions achieve eventual delivery and full conservation.
+    """
+    import random
+    env = simpy.Environment()
+    rec = EventRecorder()
+    pid = [0]
+
+    # Deterministic loss: specifically drop packet seq 2
+    class ControlledDropLink(NetworkLink):
+        def transmit(self, pkt, on_delivered=None, on_dropped=None):
+            if pkt.seq_num == 2 and not pkt.is_retransmit:
+                if self.recorder:
+                    self.recorder.record_drop(pkt, "channel_error", self.env.now, len(self.tx_resource.queue))
+                if on_dropped:
+                    on_dropped(pkt, "channel_error")
+                yield self.env.timeout(0.0)
+                return
+            yield from super().transmit(pkt, on_delivered=on_delivered, on_dropped=on_dropped)
+
+    fwd_link = ControlledDropLink(env, bandwidth_bps=10_000_000.0, propagation_delay_sec=0.005, recorder=rec)
+    ret_link = NetworkLink(env, bandwidth_bps=10_000_000.0, propagation_delay_sec=0.005, recorder=None)
+
+    agent = GoBackNAgent(
+        env=env,
+        src_node=0,
+        dst_node=1,
+        forward_link=fwd_link,
+        return_link=ret_link,
+        recorder=rec,
+        packet_id_counter=pid,
+        simulation_duration=1.0,
+        window_size=4,
+        timeout_duration=0.030,
+        packet_size=1000,
+        total_packets_to_send=4
+    )
+    env.process(agent.run())
+    env.run(until=1.0)
+
+    # Packet 2 was dropped, so packet 3 arrived out of order and was discarded
+    out_of_order_drops = [e for e in rec.events if e.reason == "gbn_out_of_order"]
+    assert len(out_of_order_drops) > 0, "Out-of-order packets must be discarded and recorded"
+
+    # Retransmission of packet 2 and 3 occurred
+    assert rec.retransmissions_count > 0
+
+    # All 4 unique packets were eventually accepted in-order
+    assert len(rec.unique_delivered) == 4
+    passed, diag = rec.verify_conservation()
+    assert passed is True, f"Conservation check failed: {diag}"
+    assert diag["unique_delivered"] == 4
+    assert diag["unique_dropped"] == 0
+    assert diag["unique_in_transit"] == 0
+
+
+def test_tcp_duplicate_ack_does_not_inflate_cwnd():
+    """
+    Verifies that receiving duplicate/stale ACKs does not cause cwnd growth.
+    """
+    env = simpy.Environment()
+    rec = EventRecorder()
+    link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=rec)
+    cfg = get_scenario_config("File Downloads", "Medium")
+
+    agent = TcpLikeAgent(
+        env=env,
+        src_node=0,
+        dst_node=1,
+        forward_link=link,
+        return_link=link,
+        recorder=rec,
+        traffic_config=cfg,
+        packet_id_counter=[0],
+        simulation_duration=2.0,
+        initial_cwnd=1.0,
+        initial_ssthresh=16.0,
+        max_window=32
+    )
+
+    # First ACK seq=1 advances window (Slow Start: +1)
+    agent.in_flight[1] = Packet(1, 1, 0, 1, 1000, 0.0)
+    agent.send_times[1] = 0.0
+    agent._process_ack(1)
+    assert agent.cwnd == 2.0
+    assert agent.last_ack == 1
+
+    # Inject duplicate ACKs (seq=1)
+    agent._process_ack(1)
+    assert agent.cwnd == 2.0, "Duplicate ACK must not inflate cwnd"
+    agent._process_ack(1)
+    assert agent.cwnd == 2.0, "Duplicate ACK must not inflate cwnd"
+
+    # New ACK seq=2 advances window
+    agent.in_flight[2] = Packet(2, 2, 0, 1, 1000, 0.0)
+    agent.send_times[2] = 0.0
+    agent._process_ack(2)
+    assert agent.cwnd == 3.0
+    assert agent.last_ack == 2
+
+
+def test_tcp_cwnd_clamped_to_max_window():
+    """
+    Verifies that cwnd never exceeds max_window regardless of incoming ACKs.
+    """
+    env = simpy.Environment()
+    rec = EventRecorder()
+    link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=rec)
+    cfg = get_scenario_config("File Downloads", "High")
+
+    max_win = 4
+    agent = TcpLikeAgent(
+        env=env,
+        src_node=0,
+        dst_node=1,
+        forward_link=link,
+        return_link=link,
+        recorder=rec,
+        traffic_config=cfg,
+        packet_id_counter=[0],
+        simulation_duration=2.0,
+        initial_cwnd=1.0,
+        initial_ssthresh=16.0,
+        max_window=max_win
+    )
+
+    # Process 20 sequential new ACKs
+    for seq in range(1, 21):
+        agent.in_flight[seq] = Packet(seq, seq, 0, 1, 1000, 0.0)
+        agent.send_times[seq] = 0.0
+        agent._process_ack(seq)
+        assert agent.cwnd <= float(max_win), f"cwnd {agent.cwnd} exceeded max_window {max_win}"
+
+    assert agent.cwnd == float(max_win)
+
+
+def test_tcp_duplicate_retransmission_prevention():
+    """
+    Verifies that multiple concurrent drop or RTO events do not trigger
+    redundant retransmission processes for the same packet.
+    """
+    env = simpy.Environment()
+    rec = EventRecorder()
+    link = NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.010, recorder=rec)
+    cfg = get_scenario_config("LMS Access", "Low")
+
+    agent = TcpLikeAgent(
+        env=env,
+        src_node=0,
+        dst_node=1,
+        forward_link=link,
+        return_link=link,
+        recorder=rec,
+        traffic_config=cfg,
+        packet_id_counter=[0],
+        simulation_duration=2.0
+    )
+
+    pkt1 = Packet(1, 1, 0, 1, 1000, 0.0)
+    agent.in_flight[1] = pkt1
+    agent.send_times[1] = 0.0
+
+    # First loss notification schedules retransmission
+    agent._handle_loss(1)
+    assert 1 in agent.retransmitting
+    assert len(agent.retransmitting) == 1
+
+    # Second concurrent loss notification must be ignored
+    agent._handle_loss(1)
+    assert len(agent.retransmitting) == 1
+
+
+def test_independent_conservation_state_machine():
+    """
+    Tests EventRecorder's independent 3-state machine and verify_conservation.
+    """
+    rec = EventRecorder()
+    p1 = Packet(packet_id=1, seq_num=1, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
+    p2 = Packet(packet_id=2, seq_num=2, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
+    p3 = Packet(packet_id=3, seq_num=3, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
+    p4 = Packet(packet_id=4, seq_num=4, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0)
+
+    # 1. Generation: all 4 are IN_TRANSIT
+    for p in [p1, p2, p3, p4]:
+        rec.record_generate(p, 0.0)
+
+    # 2. Deliver p1
+    rec.record_receive(p1, 0.010)
+
+    # 3. Drop p2, then retransmit and deliver p2
+    rec.record_drop(p2, "queue_overflow", 0.015)
+    assert rec.packet_states[p2.unique_key] == "DROPPED"
+
+    p2_retx = Packet(packet_id=5, seq_num=2, src_node=0, dst_node=1, size_bytes=1000, gen_time=0.0, is_retransmit=True)
+    rec.record_generate(p2_retx, 0.030)
+    assert rec.packet_states[p2.unique_key] == "IN_TRANSIT"
+
+    rec.record_receive(p2_retx, 0.045)
+    assert rec.packet_states[p2.unique_key] == "DELIVERED"
+
+    # 4. Drop p4 permanently
+    rec.record_drop(p4, "channel_error", 0.020)
+
+    # 5. p3 stays in flight (IN_TRANSIT)
+
+    passed, diag = rec.verify_conservation()
+    assert passed is True
+    assert diag["total_unique_generated"] == 4
+    assert diag["unique_delivered"] == 2 # p1, p2
+    assert diag["unique_dropped"] == 1   # p4
+    assert diag["unique_in_transit"] == 1 # p3
+    assert len(diag["deliv_drop_overlap"]) == 0
+    assert len(diag["deliv_transit_overlap"]) == 0
+    assert len(diag["drop_transit_overlap"]) == 0
+
+
+def test_metrics_partial_bucket_rate_calculation():
+    """
+    Verifies that the final fractional time-series bucket does not underestimate
+    throughput by dividing by a full 1.0s window.
+    """
+    rec = EventRecorder()
+    sim_duration = 2.5 # 2 full seconds + 0.5s partial second
+
+    # Delivery in final partial second (time = 2.2s)
+    p = Packet(packet_id=1, seq_num=1, src_node=0, dst_node=1, size_bytes=5000, gen_time=2.1)
+    rec.record_generate(p, 2.1)
+    rec.record_receive(p, 2.2)
+
+    metrics = calculate_metrics(rec, simulation_duration=sim_duration, data_rate_bps=1_000_000.0)
+    ts = metrics["time_series"]
+
+    # Bucket 2 spans 2.0 to 2.5s (duration = 0.5s)
+    # Throughput should be (5000 * 8) / (0.5 * 1000) = 80.0 Kbps
+    bucket_2 = ts[2]
+    assert bucket_2["time"] == 2
+    assert bucket_2["throughput_kbps"] == 80.0
+
+
+def test_engine_leaky_bucket_integration():
+    """
+    Verifies that SimPySimulationEngine correctly attaches LeakyBucketQueue
+    when scenario is 'Leaky Bucket' and reports shaper statistics.
+    """
+    engine = SimPySimulationEngine(
+        num_students=4,
+        protocol="UDP",
+        bandwidth="1 Mbps",
+        delay="10ms",
+        simulation_duration=2.0,
+        scenario_name="Leaky Bucket",
+        traffic_intensity="High",
+        seed=42
+    )
+    res = engine.run()
+
+    assert engine.enable_leaky_bucket is True
+    assert "shaper_statistics" in res
+    stats = res["shaper_statistics"]
+    assert stats["drained_packets"] > 0
+    assert stats["peak_buffer_bytes"] > 0
+    assert res["conservation_passed"] is True
+
 

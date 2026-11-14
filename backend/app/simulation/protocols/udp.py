@@ -86,8 +86,12 @@ class UdpAgent:
                 )
 
                 self.recorder.record_generate(pkt, env.now, len(self.link.tx_resource.queue))
+
+                def on_udp_delivered(p: Packet):
+                    self.recorder.record_receive(p, env.now, len(self.link.tx_resource.queue))
+
                 # Transmit over bottleneck link (concurrent process)
-                env.process(self.link.transmit(pkt))
+                env.process(self.link.transmit(pkt, on_delivered=on_udp_delivered))
 
             # 3. Inter-packet arrival interval
             # Jittered around base arrival interval

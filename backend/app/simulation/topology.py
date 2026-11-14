@@ -93,11 +93,16 @@ class NetworkLink:
         # 6. Propagation delay across the link distance
         yield env.timeout(self.propagation_delay_sec)
 
-        # 7. Delivery at destination receiver
+        # 7. Arrival at destination physical interface (decoupled from application acceptance)
         if self.recorder:
-            self.recorder.record_receive(pkt, env.now, len(self.tx_resource.queue))
+            self.recorder.record_link_arrival(pkt, env.now, len(self.tx_resource.queue))
+
         if on_delivered:
+            # Protocol agent decides whether to accept (in-order) or discard (out-of-order)
             on_delivered(pkt)
+        elif self.recorder:
+            # Fallback for direct link usage where no protocol agent manages delivery acceptance
+            self.recorder.record_receive(pkt, env.now, len(self.tx_resource.queue))
 
         return True
 
