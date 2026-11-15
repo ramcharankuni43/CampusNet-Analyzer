@@ -23,13 +23,13 @@ try:
     from .database import engine, Base, SessionLocal, init_db, get_db
     from .models import Experiment
     from .services.seed_data import seed_database
-    from .services.simulation_service import check_ns2_installation
+    from .services.simulation_service import check_ns2_installation, check_simulation_engine
     from .api import dashboard, experiments, simulations, reports, system
 except (ImportError, ValueError):
     from app.database import engine, Base, SessionLocal, init_db, get_db
     from app.models import Experiment
     from app.services.seed_data import seed_database
-    from app.services.simulation_service import check_ns2_installation
+    from app.services.simulation_service import check_ns2_installation, check_simulation_engine
     from app.api import dashboard, experiments, simulations, reports, system
 
 logger = logging.getLogger("edunet.api")
@@ -51,6 +51,13 @@ async def lifespan(app: FastAPI):
         print(f"[CampusNet Analyzer] Warning during database seeding: {e}")
     finally:
         db.close()
+
+    # Pre-warm and cache SimPy discrete-event simulation engine readiness
+    try:
+        sim_readiness = check_simulation_engine()
+        print(f"[CampusNet Analyzer] SimPy Engine Readiness: operational={sim_readiness.get('operational', False)} ({sim_readiness.get('diagnostic', '')})")
+    except Exception as e:
+        print(f"[CampusNet Analyzer] Warning during simulation engine readiness check: {e}")
     
     yield
 
@@ -139,6 +146,7 @@ def health_check(db: Session = Depends(get_db)):
         db_ok = False
 
     ns_info = check_ns2_installation()
+    sim_readiness = check_simulation_engine()
     return {
         "status": "online" if db_ok else "degraded",
         "service": "CampusNet-Analyzer API",
@@ -148,9 +156,14 @@ def health_check(db: Session = Depends(get_db)):
             "engine": "sqlite"
         },
         "simulator": {
+            "operational": sim_readiness.get("operational", False),
+            "engine": sim_readiness.get("engine", "SimPy Discrete-Event Simulation Engine"),
+            "version": sim_readiness.get("version", "4.1.1"),
+            "smoke_test_latency_ms": sim_readiness.get("smoke_test_latency_ms", 0.0),
+            "conservation_verified": sim_readiness.get("conservation_verified", False),
             "ns2_installed": ns_info.get("installed", False),
-            "execution_mode": ns_info.get("execution_mode", "DEMO MODE — Sample Data"),
-            "diagnostic": ns_info.get("diagnostic", "")
+            "execution_mode": "SimPy Discrete-Event Engine" if sim_readiness.get("operational", False) else ns_info.get("execution_mode", "DEMO MODE — Sample Data"),
+            "diagnostic": sim_readiness.get("diagnostic", "")
         }
     }
 

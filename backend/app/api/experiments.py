@@ -20,7 +20,10 @@ def format_experiment_response(exp: Experiment) -> ExperimentResponse:
     pdr = None
     delay_ms = None
     if exp.result:
-        ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
+        try:
+            ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
+        except Exception:
+            ts = []
         res_resp = ResultResponse(
             id=exp.result.id,
             experiment_id=exp.result.experiment_id,

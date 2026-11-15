@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           ) : (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span>LIVE NS-2</span>
+              <span>{status?.simulator_operational ? 'SIMPY ENGINE' : (status?.ns2_installed ? 'LIVE NS-2' : 'REALTIME')}</span>
             </div>
           )}
         </div>

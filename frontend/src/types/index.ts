@@ -59,6 +59,8 @@ export interface SimulationConfig {
   experiment_type: string;
   packet_size?: number;
   window_size?: number;
+  queue_capacity?: number;
+  seed?: number | null;
   force_demo?: boolean;
 }
 
@@ -198,4 +200,10 @@ export interface SystemStatusResponse {
   db_connected: boolean;
   database_path: string;
   total_experiments: number;
+  simulator_operational?: boolean;
+  simulator_engine?: string;
+  simulator_version?: string;
+  simulator_diagnostic?: string;
+  smoke_test_latency_ms?: number;
+  conservation_verified?: boolean;
 }

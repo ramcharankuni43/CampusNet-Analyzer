@@ -194,10 +194,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
         <div className="p-2.5 rounded-lg bg-white border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-medium text-[#475569]">Engine Status</span>
-            {status?.ns2_installed ? (
+            {status?.simulator_operational || status?.ns2_installed ? (
               <span className="flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                NS-2 ({status.execution_mode.toUpperCase()})
+                {status?.simulator_operational ? 'SIMPY ENGINE' : 'NS-2 LIVE'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-[9px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
@@ -210,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
             <Info className="w-3 h-3 text-slate-400 flex-shrink-0" />
             {isDemo
               ? 'Academic reference dataset mode.'
-              : 'Live discrete-event NS-2 pipeline active.'}
+              : 'Live discrete-event simulation engine active.'}
           </div>
         </div>
       </div>

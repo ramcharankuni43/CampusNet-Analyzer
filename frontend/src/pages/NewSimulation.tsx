@@ -14,22 +14,47 @@ export const NewSimulation: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: boolean }>({});
 
+  const [useCustomSeed, setUseCustomSeed] = useState<boolean>(true);
   const [formData, setFormData] = useState<SimulationConfig>({
-    name: isDemo ? 'Demo Scenario: 25 Students (TCP)' : 'Live NS-2 Simulation: Campus Workload',
+    name: isDemo ? 'Demo Scenario: 25 Students (TCP)' : 'Online Classroom Workload Simulation',
     description: isDemo
       ? 'Predefined demonstration workload evaluating e-learning stream reliability.'
-      : 'Live discrete-event NS-2 simulation modeling campus LMS traffic.',
-    users: 25,
+      : 'SimPy discrete-event simulation modeling university online classroom traffic.',
+    users: 10,
     traffic_level: 'Medium',
     protocol: 'TCP',
-    data_rate: '1 Mbps',
+    data_rate: '10 Mbps',
     delay: '20ms',
-    simulation_time: 60,
-    experiment_type: 'Normal Traffic',
-    packet_size: 1024,
+    simulation_time: 5,
+    experiment_type: 'Online Classroom',
+    packet_size: 512,
     window_size: 32,
+    queue_capacity: 50,
+    seed: 42,
     force_demo: isDemo,
   });
+
+  const handleBenchmarkPreset = () => {
+    setUseCustomSeed(true);
+    setFormData({
+      ...formData,
+      name: 'Official Benchmark - Online Classroom',
+      description: 'University Online Classroom: 10 students, 10 Mbps bottleneck, 20ms delay, 5s duration, seed 42.',
+      users: 10,
+      protocol: 'TCP',
+      traffic_level: 'Medium',
+      data_rate: '10 Mbps',
+      delay: '20ms',
+      simulation_time: 5,
+      experiment_type: 'Online Classroom',
+      packet_size: 512,
+      window_size: 32,
+      queue_capacity: 50,
+      seed: 42,
+    });
+    setValidationErrors({});
+    setError(null);
+  };
 
   const handleDemoPreset = (users: number) => {
     let traffic: 'Low' | 'Medium' | 'High' = 'Medium';
@@ -146,6 +171,7 @@ export const NewSimulation: React.FC = () => {
     try {
       const payload: SimulationConfig = {
         ...formData,
+        seed: useCustomSeed ? (formData.seed ?? 42) : null,
         force_demo: isDemo,
       };
 
@@ -159,13 +185,7 @@ export const NewSimulation: React.FC = () => {
         navigate(`/monitor?id=${response.id}`);
       }
     } catch (err: any) {
-      if (!isDemo) {
-        setError(
-          '❌ LIVE NS-2 SIMULATION UNAVAILABLE: Actual NS-2 execution could not complete. Check your NS-2 installation in Settings or switch to Demo Mode.'
-        );
-      } else {
-        setError(err.message || 'Failed to start demo simulation.');
-      }
+      setError(err.message || 'Simulation execution failed. Please verify configuration.');
       setSubmitting(false);
     }
   };
@@ -182,20 +202,49 @@ export const NewSimulation: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-[#0F172A]">
-                  {isDemo ? 'Demo Scenario Quick Runner' : 'Configure Real-Time NS-2 Simulation'}
+                  {isDemo ? 'Demo Scenario Quick Runner' : 'Configure Discrete-Event Network Simulation'}
                 </h2>
                 <ModeBadge isDemo={isDemo} />
               </div>
               <p className="text-xs text-[#64748B]">
                 {isDemo
-                  ? 'Instantly select and execute a verified demonstration scenario (zero NS-2 dependency)'
-                  : 'Configure discrete-event simulation: Generates dynamic Tcl, runs NS-2, and parses actual trace (.tr)'}
+                  ? 'Instantly select and execute a verified demonstration scenario (zero server dependency)'
+                  : 'Configure SimPy discrete-event simulation: packet generation, TCP AIMD / UDP CBR, bottleneck link serialization, and conservation audit'}
               </p>
             </div>
           </div>
           <ModeSelector compact />
         </div>
       </div>
+
+      {/* Official Benchmark Quick-Preset Banner */}
+      {!isDemo && (
+        <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                  Academic Benchmark Profile
+                </span>
+                <span className="text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                  10 Students • 10 Mbps • 5s • Seed 42
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                Load the approved Online Classroom benchmark parameters yielding 11,998 unique packets with 100% PDR.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleBenchmarkPreset}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors whitespace-nowrap self-stretch sm:self-auto text-center"
+          >
+            Apply Official Benchmark
+          </button>
+        </div>
+      )}
 
       {/* Demo Mode Scenario Selector */}
       {isDemo && (
@@ -359,6 +408,7 @@ export const NewSimulation: React.FC = () => {
                 <option value="1 Mbps">1 Mbps (Standard Campus)</option>
                 <option value="2 Mbps">2 Mbps (High Speed)</option>
                 <option value="5 Mbps">5 Mbps (High Concurrency)</option>
+                <option value="10 Mbps">10 Mbps (High Speed / Official Benchmark)</option>
               </select>
               <p className="text-[11px] text-slate-400 mt-1">Bandwidth between R1 and R2</p>
             </div>
@@ -413,6 +463,7 @@ export const NewSimulation: React.FC = () => {
                   validationErrors.simulation_time ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
                 }`}
               >
+                <option value={5}>5 Seconds (Official Benchmark / Fast Run)</option>
                 <option value={10}>10 Seconds (Rapid test)</option>
                 <option value={30}>30 Seconds (Fast check)</option>
                 <option value={60}>60 Seconds (Standard Lab)</option>
@@ -433,6 +484,7 @@ export const NewSimulation: React.FC = () => {
                 validationErrors.experiment_type ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
               }`}
             >
+              <option value="Online Classroom">Online Classroom (Official Academic Benchmark)</option>
               <option value="Normal Traffic">Normal Traffic (Standard Campus E-Learning)</option>
               <option value="High Traffic">High Traffic (Peak Concurrency Lecture Load)</option>
               <option value="TCP vs UDP">TCP vs UDP Protocol Benchmark</option>
@@ -463,7 +515,7 @@ export const NewSimulation: React.FC = () => {
                 }`}
                 placeholder="1024"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Payload MTU size per packet</p>
+              <p className="text-[11px] text-slate-400 mt-1">Payload MTU size (512 for Online Classroom, 1024 standard)</p>
             </div>
 
             <div>
@@ -482,6 +534,66 @@ export const NewSimulation: React.FC = () => {
               <p className="text-[11px] text-slate-400 mt-1">Maximum unacknowledged packets inflight</p>
             </div>
           </div>
+
+          {/* Advanced Tuning: PRNG Seed & Queue Limit */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[#0F172A]">
+                  Random Seed (Reproducibility)
+                </label>
+                <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomSeed}
+                    onChange={(e) => {
+                      setUseCustomSeed(e.target.checked);
+                      if (!e.target.checked) {
+                        setFormData({ ...formData, seed: null });
+                      } else {
+                        setFormData({ ...formData, seed: 42 });
+                      }
+                    }}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                  />
+                  <span>Deterministic Seed</span>
+                </label>
+              </div>
+              <input
+                type="number"
+                disabled={!useCustomSeed}
+                value={useCustomSeed ? (formData.seed ?? 42) : ''}
+                onChange={(e) => setFormData({ ...formData, seed: parseInt(e.target.value, 10) || 0 })}
+                className={`w-full px-3 py-2 text-xs rounded-lg border font-mono ${
+                  useCustomSeed
+                    ? 'border-[#CBD5E1] bg-white text-slate-900 focus:ring-2 focus:ring-blue-500'
+                    : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
+                placeholder={useCustomSeed ? '42' : 'Random seed generated automatically by PRNG'}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                {useCustomSeed
+                  ? 'Deterministic seed (42 reproduces exact official benchmark metrics)'
+                  : 'Automatic PRNG seed generated independently per execution'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+                Router Queue Capacity (Packets)
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={500}
+                value={formData.queue_capacity || 50}
+                onChange={(e) => setFormData({ ...formData, queue_capacity: parseInt(e.target.value, 10) || 50 })}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono"
+                placeholder="50"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Bottleneck router queue limit before packet drop</p>
+            </div>
+          </div>
         </div>
 
         {/* Topology Summary Preview */}
@@ -489,14 +601,14 @@ export const NewSimulation: React.FC = () => {
           <div className="flex items-center gap-3">
             <Network className="w-6 h-6 text-blue-600 flex-shrink-0" />
             <div>
-              <h4 className="text-xs font-bold text-[#0F172A]">Simulated NS-2 Topology Plan</h4>
+              <h4 className="text-xs font-bold text-[#0F172A]">Simulated Network Topology Plan</h4>
               <p className="text-[11px] text-[#64748B] break-words">
-                {formData.users} Student Nodes (10Mb, 5ms) ➔ Access Router R1 ➔ [{formData.data_rate}, {formData.delay || '20ms'}, {formData.experiment_type === 'Leaky Bucket' ? 'RED' : 'DropTail'}] ➔ Core Router R2 ➔ LMS Server (100Mb)
+                {formData.users} Student Nodes (10Mb, 5ms) ➔ Access Router R1 ➔ [{formData.data_rate}, {formData.delay || '20ms'}, Queue: {formData.queue_capacity || 50} pkts, {formData.experiment_type === 'Leaky Bucket' ? 'LeakyBucketQueue' : 'DropTail'}] ➔ Core Router R2 ➔ LMS Server (100Mb)
               </p>
             </div>
           </div>
           <span className="text-xs font-mono font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded whitespace-nowrap self-start sm:self-auto">
-            {formData.protocol} • {formData.simulation_time}s
+            {formData.protocol} • {formData.simulation_time}s {useCustomSeed ? `• Seed ${formData.seed ?? 42}` : '• Random Seed'}
           </span>
         </div>
 
@@ -516,10 +628,10 @@ export const NewSimulation: React.FC = () => {
               {submitting
                 ? isDemo
                   ? 'Loading Demo Experiment...'
-                  : 'Executing Live NS-2 Engine...'
+                  : 'Executing SimPy Discrete-Event Engine...'
                 : isDemo
                 ? '▶ Run Demo Experiment'
-                : '▶ RUN LIVE NS-2 SIMULATION'}
+                : '▶ RUN DISCRETE-EVENT SIMULATION'}
             </span>
           </button>
         </div>

@@ -33,6 +33,7 @@ function validateSimulationConfig(formData) {
     'Leaky Bucket',
     'Sliding Window',
     'Go-Back-N',
+    'Online Classroom',
   ];
   if (!supportedTypes.includes(formData.experiment_type)) {
     errs.experiment_type = 'Unsupported experiment type';

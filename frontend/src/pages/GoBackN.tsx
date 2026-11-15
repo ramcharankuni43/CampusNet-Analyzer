@@ -83,7 +83,7 @@ export const GoBackN: React.FC = () => {
       });
       setNs2Result(res);
     } catch (err: any) {
-      setNs2Error(err.message || 'Failed to execute NS-2 Go-Back-N');
+      setNs2Error(err.message || 'Failed to execute Go-Back-N simulation');
     } finally {
       setIsRunningNs2(false);
     }

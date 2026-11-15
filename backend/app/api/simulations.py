@@ -70,7 +70,7 @@ def trigger_simulation(
     }
 
     # Dispatch asynchronous background task
-    background_tasks.add_task(run_simulation_task, exp.id, SessionLocal)
+    background_tasks.add_task(run_simulation_task, exp.id, SessionLocal, seed=config.seed)
 
     return SimulationStatusResponse(
         id=exp.id,
@@ -209,7 +209,10 @@ def get_simulation_status(id: int, db: Session = Depends(get_db)):
 
     res_resp = None
     if exp.result:
-        ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
+        try:
+            ts = json.loads(exp.result.time_series_json) if exp.result.time_series_json else []
+        except Exception:
+            ts = []
         res_resp = ResultResponse(
             id=exp.result.id,
             experiment_id=exp.result.experiment_id,

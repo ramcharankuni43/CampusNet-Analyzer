@@ -90,6 +90,7 @@ class SimulationConfigCreate(BaseModel):
     window_size: Optional[int] = Field(default=32, ge=1, le=256)
     packet_size: Optional[int] = Field(default=1024, ge=64, le=65535)
     force_demo: Optional[bool] = False
+    seed: Optional[int] = Field(default=None, description="Optional deterministic PRNG seed")
 
     @model_validator(mode="before")
     @classmethod
@@ -152,10 +153,10 @@ class SimulationConfigCreate(BaseModel):
                 if not data.get("experiment_type"): data["experiment_type"] = "Go-Back-N"
 
         # Defaults for remaining fields
-        if not data.get("users"):
+        if data.get("users") is None:
             data["users"] = 10
         if not data.get("traffic_level"):
-            u = data["users"]
+            u = data.get("users") or 10
             if u <= 20: data["traffic_level"] = "Low"
             elif u <= 75: data["traffic_level"] = "Medium"
             elif u <= 175: data["traffic_level"] = "High"
@@ -168,7 +169,7 @@ class SimulationConfigCreate(BaseModel):
             else: data["data_rate"] = "1 Mbps"
         if not data.get("delay"):
             data["delay"] = "20ms"
-        if not data.get("simulation_time"):
+        if data.get("simulation_time") is None:
             data["simulation_time"] = 60.0
         if not data.get("experiment_type"):
             data["experiment_type"] = "Normal Traffic"
@@ -262,13 +263,19 @@ class SimulationStatusResponse(BaseModel):
 class SystemStatusResponse(BaseModel):
     ns2_installed: bool
     ns2_path: Optional[str] = None
-    execution_mode: str # "NS-2 LIVE SIMULATION" or "DEMO MODE — Sample Data"
+    execution_mode: str # "SimPy Discrete-Event Simulation Engine", "NS-2 LIVE SIMULATION" or "DEMO MODE — Sample Data"
     wsl_detected: bool
     wsl_distro: Optional[str] = None
     python_version: str
     db_connected: bool
     database_path: str
     total_experiments: int
+    simulator_operational: Optional[bool] = True
+    simulator_engine: Optional[str] = "SimPy Discrete-Event Simulation Engine"
+    simulator_version: Optional[str] = "4.1.1"
+    simulator_diagnostic: Optional[str] = None
+    smoke_test_latency_ms: Optional[float] = None
+    conservation_verified: Optional[bool] = None
 
 class GbnSimulationRequest(BaseModel):
     window_size: int = Field(default=8, ge=1, le=64)

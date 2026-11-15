@@ -14,7 +14,8 @@ import {
   Sliders,
   ShieldCheck,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Activity
 } from 'lucide-react';
 import { api } from '../services/api';
 import { SystemStatusResponse } from '../types';
@@ -100,8 +101,8 @@ export const Settings: React.FC = () => {
         <ModeSelector />
       </div>
 
-      {/* System Health Status 5-Card Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      {/* System Health Status 6-Card Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Backend API */}
         <div className="p-4 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between mb-2">
@@ -110,7 +111,7 @@ export const Settings: React.FC = () => {
           </div>
           <div className="text-xs text-slate-500 font-medium">Backend API</div>
           <div className="text-sm font-bold text-slate-900 mt-0.5">FastAPI Online</div>
-          <span className="text-[10px] text-slate-400">Port 8000 (Python {status?.python_version || '3.10+'})</span>
+          <span className="text-[10px] text-slate-400">Port 8000 (Python {status?.python_version || '3.14+'})</span>
         </div>
 
         {/* Database */}
@@ -121,9 +122,24 @@ export const Settings: React.FC = () => {
           </div>
           <div className="text-xs text-slate-500 font-medium">Database</div>
           <div className="text-sm font-bold text-slate-900 mt-0.5">
-            {status?.db_connected ? 'SQLite WAL Mode' : 'Disconnected'}
+            {status?.db_connected ? 'SQLite WAL' : 'Disconnected'}
           </div>
           <span className="text-[10px] text-slate-400">{status?.total_experiments ?? 0} Experiments</span>
+        </div>
+
+        {/* SimPy Discrete-Event Engine */}
+        <div className="p-4 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <Activity className="w-5 h-5 text-emerald-600" />
+            <span className={`w-2.5 h-2.5 rounded-full ${status?.simulator_operational ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+          </div>
+          <div className="text-xs text-slate-500 font-medium">SimPy Engine</div>
+          <div className="text-sm font-bold text-slate-900 mt-0.5">
+            {status?.simulator_operational ? 'SimPy Active' : 'Offline'}
+          </div>
+          <span className="text-[10px] text-slate-400 truncate block">
+            {status?.simulator_version ? `v${status.simulator_version} Verified` : 'Discrete-Event'}
+          </span>
         </div>
 
         {/* WSL2 Host */}
@@ -155,15 +171,15 @@ export const Settings: React.FC = () => {
         {/* NS-2 Engine */}
         <div className="p-4 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            <span className={`w-2.5 h-2.5 rounded-full ${status?.ns2_installed ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <ShieldCheck className="w-5 h-5 text-purple-600" />
+            <span className={`w-2.5 h-2.5 rounded-full ${status?.ns2_installed ? 'bg-emerald-500' : 'bg-slate-400'}`} />
           </div>
           <div className="text-xs text-slate-500 font-medium">NS-2 Simulator</div>
           <div className="text-sm font-bold text-slate-900 mt-0.5">
-            {status?.ns2_installed ? 'NS-2 Ready' : 'Offline / Demo'}
+            {status?.ns2_installed ? 'NS-2 Ready' : 'Not Installed'}
           </div>
           <span className="text-[10px] text-slate-400 truncate block">
-            {status?.ns2_installed ? 'Discrete-Event' : 'Calibrated Mode'}
+            {status?.ns2_installed ? 'WSL2 / Native' : 'Optional Extra'}
           </span>
         </div>
       </div>

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, DB_PATH
 from ..models import Experiment
 from ..schemas import SystemStatusResponse
-from ..services.simulation_service import check_ns2_installation, check_wsl_status
+from ..services.simulation_service import check_ns2_installation, check_wsl_status, check_simulation_engine
 from ..services.seed_data import seed_database
 
 router = APIRouter(prefix="/system", tags=["System"])
@@ -15,8 +15,15 @@ router = APIRouter(prefix="/system", tags=["System"])
 def get_system_status(db: Session = Depends(get_db)):
     ns_info = check_ns2_installation()
     wsl_info = check_wsl_status()
+    sim_readiness = check_simulation_engine()
     total_exps = db.query(Experiment).count()
-    mode = "NS-2 LIVE SIMULATION" if ns_info["installed"] else "DEMO MODE — Sample Data"
+
+    if sim_readiness.get("operational"):
+        mode = "SimPy Discrete-Event Simulation Engine"
+    elif ns_info.get("installed"):
+        mode = "NS-2 LIVE SIMULATION"
+    else:
+        mode = "DEMO MODE — Sample Data"
 
     return SystemStatusResponse(
         ns2_installed=ns_info["installed"],
@@ -27,7 +34,13 @@ def get_system_status(db: Session = Depends(get_db)):
         python_version=sys.version.split()[0],
         db_connected=True,
         database_path=DB_PATH,
-        total_experiments=total_exps
+        total_experiments=total_exps,
+        simulator_operational=sim_readiness.get("operational", False),
+        simulator_engine=sim_readiness.get("engine", "SimPy Discrete-Event Simulation Engine"),
+        simulator_version=sim_readiness.get("version", "4.1.1"),
+        simulator_diagnostic=sim_readiness.get("diagnostic", ""),
+        smoke_test_latency_ms=sim_readiness.get("smoke_test_latency_ms"),
+        conservation_verified=sim_readiness.get("conservation_verified")
     )
 
 @router.post("/seed")

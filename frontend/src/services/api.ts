@@ -59,7 +59,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     });
-    if (!res.ok) throw new Error(`Failed to initiate simulation (${res.status})`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const msg = errData.detail || errData.error || `Failed to initiate simulation (HTTP ${res.status})`;
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  async getHealth(): Promise<any> {
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error(`Health check probe failed (HTTP ${res.status})`);
     return res.json();
   },
 

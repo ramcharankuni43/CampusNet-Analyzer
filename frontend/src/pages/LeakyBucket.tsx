@@ -77,7 +77,7 @@ export const LeakyBucket: React.FC = () => {
       });
       setNs2Result(res);
     } catch (err: any) {
-      setNs2Error(err.message || 'Failed to execute NS-2 Leaky Bucket');
+      setNs2Error(err.message || 'Failed to execute Leaky Bucket simulation');
     } finally {
       setIsRunningNs2(false);
     }

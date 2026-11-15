@@ -68,20 +68,20 @@ export const TcpUdpComparison: React.FC = () => {
 
   const handleRunBatch = async () => {
     setIsRunningBatch(true);
-    setBatchMessage('Executing real NS-2 multi-rate simulations in WSL2 (256Kbps, 512Kbps, 1Mbps, 2Mbps, 5Mbps)...');
+    setBatchMessage('Executing multi-rate discrete-event simulation batch (256Kbps, 512Kbps, 1Mbps, 2Mbps, 5Mbps)...');
     try {
       await api.runTcpUdpBatch();
       await loadData();
-      setBatchMessage('NS-2 multi-rate simulation batch completed! Database metrics loaded.');
+      setBatchMessage('Multi-rate discrete-event simulation batch completed! Database metrics loaded.');
       setTimeout(() => setBatchMessage(null), 5000);
     } catch (err: any) {
-      setBatchMessage(`Simulation batch failed: ${err.message || 'Error executing NS-2'}`);
+      setBatchMessage(`Simulation batch failed: ${err.message || 'Error executing batch'}`);
     } finally {
       setIsRunningBatch(false);
     }
   };
 
-  // Real NS-2 results dynamically sourced from database (or verified demo benchmark)
+  // Discrete-event results dynamically sourced from database (or verified demo benchmark)
   const comparisonData = ratesData.length > 0
     ? ratesData.map((r) => ({
         label: `${r.rate}`,

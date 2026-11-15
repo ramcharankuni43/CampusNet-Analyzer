@@ -20,10 +20,10 @@ import { useSimulationMode } from '../context/SimulationModeContext';
 
 const STAGES = [
   { key: 'preparing', label: 'Preparing Simulation', icon: Cpu },
-  { key: 'generating', label: 'Generating NS-2 File', icon: Network },
-  { key: 'running', label: 'Running Simulation', icon: FileCode },
-  { key: 'processing', label: 'Processing Trace', icon: Activity },
-  { key: 'calculating', label: 'Calculating Metrics', icon: BarChart3 },
+  { key: 'generating', label: 'Generating Topology', icon: Network },
+  { key: 'running', label: 'Running Discrete-Event Simulation', icon: FileCode },
+  { key: 'processing', label: 'Processing Event Trace', icon: Activity },
+  { key: 'calculating', label: 'Calculating Metrics & Conservation', icon: BarChart3 },
   { key: 'completed', label: 'Completed', icon: CheckCircle2 },
 ];
 
@@ -52,6 +52,7 @@ export const SimulationMonitor: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [isLiveWs, setIsLiveWs] = useState<boolean>(false);
+  const wsConnectedRef = React.useRef<boolean>(false);
   const logContainerRef = React.useRef<HTMLDivElement>(null);
 
   // If no simulation ID in query params, load experiments to select one
@@ -81,9 +82,18 @@ export const SimulationMonitor: React.FC = () => {
 
     // Subscribe to WebSocket
     const unsubscribe = subscribeSimulationStream(simId, {
-      onOpen: () => setIsLiveWs(true),
-      onClose: () => setIsLiveWs(false),
-      onError: () => setIsLiveWs(false),
+      onOpen: () => {
+        wsConnectedRef.current = true;
+        setIsLiveWs(true);
+      },
+      onClose: () => {
+        wsConnectedRef.current = false;
+        setIsLiveWs(false);
+      },
+      onError: () => {
+        wsConnectedRef.current = false;
+        setIsLiveWs(false);
+      },
       onMessage: (data) => {
         setStatusData((prev) => ({
           ...prev,
@@ -97,10 +107,11 @@ export const SimulationMonitor: React.FC = () => {
 
     // Fallback periodic poll in case WS disconnects
     const fallbackPoll = setInterval(() => {
-      if (!isLiveWs && simId) {
+      if (!wsConnectedRef.current && simId) {
         api.getSimulationStatus(simId).then((data) => {
           setStatusData(data);
-          if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+          const st = (data.status || '').toLowerCase();
+          if (st === 'completed' || st === 'failed') {
             clearInterval(fallbackPoll);
           }
         }).catch(() => null);
@@ -111,7 +122,7 @@ export const SimulationMonitor: React.FC = () => {
       unsubscribe();
       clearInterval(fallbackPoll);
     };
-  }, [simId, isLiveWs]);
+  }, [simId]);
 
   // Auto-scroll logs to bottom as lines stream in
   useEffect(() => {
@@ -135,7 +146,7 @@ export const SimulationMonitor: React.FC = () => {
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-[#0F172A] truncate">Real-Time Simulation Monitor</h2>
-            <p className="text-xs text-[#64748B] truncate">Monitoring execution pipeline, NS-2 subprocess, and trace processing</p>
+            <p className="text-xs text-[#64748B] truncate">Monitoring execution pipeline, discrete-event scheduling, and trace processing</p>
           </div>
         </div>
 
@@ -163,14 +174,14 @@ export const SimulationMonitor: React.FC = () => {
             <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
             <span>
               {statusData?.error?.includes('UNAVAILABLE')
-                ? '❌ LIVE NS-2 SIMULATION UNAVAILABLE'
+                ? '❌ SIMULATION UNAVAILABLE'
                 : statusData?.error?.includes('Trace')
                 ? '❌ Trace Processing Failed'
                 : '❌ Simulation Failed'}
             </span>
           </div>
           <p className="font-semibold text-rose-900 whitespace-pre-line break-words">
-            {statusData?.error || 'The NS-2 simulation did not complete successfully. No simulated results were generated.'}
+            {statusData?.error || 'The simulation did not complete successfully. No simulated results were generated.'}
           </p>
           <div className="pt-1 flex flex-wrap items-center gap-2.5">
             <button
@@ -183,10 +194,10 @@ export const SimulationMonitor: React.FC = () => {
               Use Demo Mode (Sample Data)
             </button>
             <Link
-              to="/settings/ns2"
+              to="/settings"
               className="px-3.5 py-2 bg-white border border-rose-300 hover:bg-rose-100 text-rose-900 font-semibold rounded-lg text-xs transition-colors"
             >
-              WSL NS-2 Configuration Guide
+              Simulator Settings
             </Link>
           </div>
         </div>
@@ -208,7 +219,7 @@ export const SimulationMonitor: React.FC = () => {
             </Link>
           </div>
           <p className="text-emerald-800">
-            Real NS-2 simulation trace parsed and stored in database. Results ready for analysis.
+            SimPy discrete-event simulation trace processed and stored in database. Results ready for analysis.
           </p>
         </div>
       )}
@@ -357,14 +368,14 @@ export const SimulationMonitor: React.FC = () => {
       </div>
 
       {/* Completion Action Card */}
-      {statusData?.status === 'COMPLETED' && (
+      {isCompleted && (
         <div className="p-4 sm:p-6 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600 flex-shrink-0" />
             <div>
-              <h4 className="text-sm font-bold text-emerald-900">Simulation & Trace Processing Complete!</h4>
+              <h4 className="text-sm font-bold text-emerald-900">Discrete-Event Simulation Complete!</h4>
               <p className="text-xs text-emerald-700">
-                NS-2 trace file parsed and network performance metrics persisted to database.
+                Network performance metrics, mathematical packet conservation, and time-series telemetry persisted to database.
               </p>
             </div>
           </div>
@@ -373,6 +384,28 @@ export const SimulationMonitor: React.FC = () => {
             className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg shadow-sm transition-all w-full sm:w-auto"
           >
             <span>View Full Results & Analytics</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
+      {/* Failure Action Card */}
+      {isFailed && (
+        <div className="p-4 sm:p-6 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8 text-rose-600 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-bold text-rose-900">Simulation Execution Failed</h4>
+              <p className="text-xs text-rose-700">
+                {statusData?.error || statusData?.error_message || 'An error occurred during discrete-event simulation.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/simulation/new"
+            className="flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg shadow-sm transition-all w-full sm:w-auto"
+          >
+            <span>Configure New Run</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
