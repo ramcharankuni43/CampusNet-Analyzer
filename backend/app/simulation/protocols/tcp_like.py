@@ -14,6 +14,7 @@ Educational Model Assumptions & Deliberate Simplifications:
   AIMD principles. It does not implement full RFC 793/5681 complexities (such as Karn-Partridge
   RTT filtering, Jacobson-Karels dynamic RTO variance, Selective ACK (SACK), or ECN marking).
 """
+from __future__ import annotations
 import random
 import simpy
 from typing import Optional, Dict, Set, TYPE_CHECKING

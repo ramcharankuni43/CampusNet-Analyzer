@@ -770,4 +770,43 @@ def test_link_throughput_never_exceeds_bandwidth_capacity():
         )
 
 
+def test_simulation_module_imports_and_postponed_annotations():
+    """
+    Regression Test for Render Startup Fix:
+    Verifies that topology, protocols, and event_recorder can be imported in any order
+    without NameError ('EventRecorder' is not defined) or circular import failures,
+    and verifies that NetworkLink and CampusTopology can be instantiated cleanly.
+    """
+    import importlib
+    import simpy
+    
+    # Verify clean import of topology and protocol modules
+    top_mod = importlib.import_module("app.simulation.topology")
+    assert hasattr(top_mod, "NetworkLink")
+    assert hasattr(top_mod, "CampusTopology")
+    
+    udp_mod = importlib.import_module("app.simulation.protocols.udp")
+    assert hasattr(udp_mod, "UdpAgent")
+    
+    tcp_mod = importlib.import_module("app.simulation.protocols.tcp_like")
+    assert hasattr(tcp_mod, "TcpLikeAgent")
+    
+    gbn_mod = importlib.import_module("app.simulation.protocols.gbn")
+    assert hasattr(gbn_mod, "GoBackNAgent")
+    
+    lb_mod = importlib.import_module("app.simulation.protocols.leaky_bucket")
+    assert hasattr(lb_mod, "LeakyBucketQueue")
+    
+    # Test instantiation of NetworkLink without recorder
+    env = simpy.Environment()
+    link_no_rec = top_mod.NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.01)
+    assert link_no_rec.recorder is None
+    
+    # Test instantiation with EventRecorder
+    rec = EventRecorder()
+    link_with_rec = top_mod.NetworkLink(env, bandwidth_bps=1_000_000.0, propagation_delay_sec=0.01, recorder=rec)
+    assert link_with_rec.recorder is rec
+
+
+
 

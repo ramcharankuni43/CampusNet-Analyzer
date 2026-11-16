@@ -8,6 +8,7 @@ Behavior:
 - Packets dropped at intermediate queues are never retransmitted.
 - Fully transparent educational model of UDP transport.
 """
+from __future__ import annotations
 import random
 import simpy
 from typing import Optional, TYPE_CHECKING

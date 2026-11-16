@@ -12,6 +12,7 @@ Algorithm & Operating Principles:
   - Tracks individual packet queuing waiting time in the bucket.
   - Protects downstream bottleneck links from sudden micro-bursts and bufferbloat.
 """
+from __future__ import annotations
 import simpy
 from typing import Optional, List, Dict, Any, Callable, TYPE_CHECKING
 from .base import Packet

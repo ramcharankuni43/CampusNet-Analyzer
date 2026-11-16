@@ -9,6 +9,7 @@ Features:
 - Physical link propagation delay: D_prop
 - Optional link error model (stochastic loss rate for ARQ evaluation)
 """
+from __future__ import annotations
 import random
 import simpy
 from typing import Optional, Callable, TYPE_CHECKING

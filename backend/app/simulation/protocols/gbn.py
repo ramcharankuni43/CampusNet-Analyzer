@@ -10,6 +10,7 @@ Textbook GBN Specifications:
   the sender "Goes Back N" and retransmits all packets from base to nextseqnum - 1.
 - Retransmissions are flagged with is_retransmit=True and share the original packet unique key.
 """
+from __future__ import annotations
 import random
 import simpy
 from typing import Optional, Dict, TYPE_CHECKING
