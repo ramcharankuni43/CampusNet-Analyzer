@@ -144,7 +144,7 @@ def seed_database(db: Session, force: bool = False):
         db.query(Experiment).delete()
         db.commit()
 
-    base_time = datetime.datetime.utcnow() - datetime.timedelta(hours=6)
+    base_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=6)
 
     for i, cfg in enumerate(SAMPLE_CONFIGS):
         exp = Experiment(

@@ -22,7 +22,7 @@ class Experiment(Base):
     trace_file = Column(String(256), nullable=True)
     output_dir = Column(String(256), nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     result = relationship("Result", back_populates="experiment", uselist=False, cascade="all, delete-orphan")
 

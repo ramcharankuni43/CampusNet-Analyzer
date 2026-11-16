@@ -485,9 +485,16 @@ def test_subprocess_timeout_handling():
         mock_proc = AsyncMock()
         mock_proc.returncode = None
 
+        async def fake_wait_for(fut, timeout):
+            try:
+                fut.close()
+            except Exception:
+                pass
+            raise asyncio.TimeoutError("NS-2 process timed out after 90 seconds")
+
         with patch("app.services.simulation_service.check_ns2_installation", return_value={"installed": True, "mode": "native", "cmd": ["ns"]}):
             with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-                with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError("NS-2 process timed out after 90 seconds")):
+                with patch("asyncio.wait_for", side_effect=fake_wait_for):
                     asyncio.run(run_simulation_task(exp_id, SessionLocal))
 
         db.expire_all()
