@@ -1,5 +1,5 @@
 """
-EduNet Analyzer - Clean State Reset Utility
+CampusNet Analyzer - Clean State Reset Utility
 Resets the SQLite database, cleans temporary simulation runs, 
 and re-seeds baseline experiments (EXP-001 through EXP-008).
 """
@@ -19,7 +19,7 @@ from app.services.seed_data import seed_database
 
 def reset_clean_state():
     print("==================================================")
-    print("  EduNet Analyzer - Resetting to Clean State")
+    print("  CampusNet Analyzer - Resetting to Clean State")
     print("==================================================")
 
     # 1. Clean simulation runs directory
