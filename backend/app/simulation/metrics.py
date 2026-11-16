@@ -126,15 +126,19 @@ def calculate_metrics(
             "time": b["time"],
             "throughput_kbps": sec_tp,
             "delay_ms": sec_delay,
-            "packet_loss_percent": sec_loss,
+            "packet_loss_percent": sec_loss,  # Kept for backward compatibility (interval attempt drop rate)
+            "attempt_drop_percent": sec_loss,  # Explicit interval queue buffer drop rate %
             "packets_sent": s_count,
             "packets_received": rec_count,
-            "packets_dropped": d_count,
+            "packets_dropped": d_count,  # Physical buffer drop events in this interval
             "queue_occupancy": avg_q
         })
 
     # Independent mathematical conservation audit
     conservation_passed, conservation_diag = recorder.verify_conservation()
+
+    # Attempt-level physical drop rate across all transmission attempts
+    attempt_drop_rate = round((total_drop_events / max(1, recorder.total_transmissions)) * 100.0, 2) if recorder.total_transmissions > 0 else 0.0
 
     return {
         "throughput_kbps": throughput_kbps,
@@ -142,7 +146,8 @@ def calculate_metrics(
         "total_delivered_bytes": recorder.total_delivered_bytes,
         "total_link_transmitted_bytes": link_transmitted_bytes,
         "total_offered_bytes": recorder.total_offered_bytes,
-        "packet_loss_percent": packet_loss_percent,
+        "packet_loss_percent": packet_loss_percent,  # Terminal unique packet loss %
+        "attempt_drop_rate_percent": attempt_drop_rate,  # Physical transmission attempt drop rate %
         "packet_delivery_ratio": pdr_percent,
         "average_delay_ms": avg_delay_ms,
         "min_delay_ms": min_delay_ms,

@@ -12,7 +12,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 export const realtimeDataService = {
   /**
    * Fetch Dashboard Summary for Real-Time Mode.
-   * Strictly requests real NS-2 simulation metrics and rejects demo data.
+   * Strictly requests real simulation metrics and rejects demo data.
    */
   async getDashboardSummary(): Promise<DashboardSummary> {
     const res = await fetch(`${API_BASE}/dashboard/summary?mode=realtime`);
@@ -63,7 +63,7 @@ export const realtimeDataService = {
     const res = await fetch(`${API_BASE}/experiments/${numId}?mode=realtime`);
     if (!res.ok) {
       if (res.status === 404) {
-        throw new Error(`Experiment #${numId} was not found in the live NS-2 database.`);
+        throw new Error(`Experiment #${numId} was not found in the live simulation database.`);
       }
       throw new Error(`Failed to fetch experiment #${numId} from server (HTTP ${res.status}).`);
     }
@@ -75,7 +75,7 @@ export const realtimeDataService = {
   },
 
   /**
-   * Trigger an actual NS-2 simulation run.
+   * Trigger an actual SimPy discrete-event simulation run.
    * Strictly enforces force_demo = false.
    */
   async runSimulation(config: SimulationConfig): Promise<SimulationStatusResponse> {
@@ -94,7 +94,7 @@ export const realtimeDataService = {
       const errBody = await res.json().catch(() => ({}));
       throw new Error(
         errBody.detail ||
-        `Real-Time Simulation Failed (HTTP ${res.status}). Actual NS-2 results could not be generated. Check NS-2 configuration and try again.`
+        `Real-Time Simulation Failed (HTTP ${res.status}). Actual simulation results could not be generated. Check simulator configuration and try again.`
       );
     }
 
@@ -143,22 +143,22 @@ export const realtimeDataService = {
     }
 
     const data: ComparisonResponse = await res.json();
-    // Ensure chart labels explicitly state LIVE NS-2
+    // Ensure chart labels explicitly state SimPy Engine
     data.comparison_charts.throughput = data.comparison_charts.throughput.map((c) => ({
       ...c,
-      name: c.name.includes('LIVE') ? c.name : `${c.name} — LIVE NS-2`,
+      name: c.name.includes('SIMPY') || c.name.includes('LIVE') ? c.name : `${c.name} — SimPy Engine`,
     }));
     data.comparison_charts.loss = data.comparison_charts.loss.map((c) => ({
       ...c,
-      name: c.name.includes('LIVE') ? c.name : `${c.name} — LIVE NS-2`,
+      name: c.name.includes('SIMPY') || c.name.includes('LIVE') ? c.name : `${c.name} — SimPy Engine`,
     }));
     data.comparison_charts.delay = data.comparison_charts.delay.map((c) => ({
       ...c,
-      name: c.name.includes('LIVE') ? c.name : `${c.name} — LIVE NS-2`,
+      name: c.name.includes('SIMPY') || c.name.includes('LIVE') ? c.name : `${c.name} — SimPy Engine`,
     }));
     data.comparison_charts.pdr = data.comparison_charts.pdr.map((c) => ({
       ...c,
-      name: c.name.includes('LIVE') ? c.name : `${c.name} — LIVE NS-2`,
+      name: c.name.includes('SIMPY') || c.name.includes('LIVE') ? c.name : `${c.name} — SimPy Engine`,
     }));
 
     return data;

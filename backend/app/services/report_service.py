@@ -36,7 +36,7 @@ def generate_experiment_csv(experiment, result) -> str:
         "Timestamp"
     ])
     
-    mode = "DEMO BENCHMARK (Sample Evaluation)" if experiment.is_demo else "LIVE NS-2 TRACE (Discrete-Event Execution)"
+    mode = "DEMO BENCHMARK (Sample Evaluation)" if experiment.is_demo else "SIMPY DISCRETE-EVENT SIMULATION (Live Execution)"
     
     tp = result.throughput_kbps if result else 0.0
     loss = result.packet_loss_percent if result else 0.0
@@ -140,7 +140,7 @@ def generate_experiment_pdf(experiment, result) -> bytes:
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=14))
 
     # 2. Experiment Metadata Card Table
-    mode_str = "DEMO BENCHMARK (Calibrated Sample Evaluation)" if experiment.is_demo else "LIVE NS-2 SIMULATION (Trace Verified)"
+    mode_str = "DEMO BENCHMARK (Calibrated Sample Evaluation)" if experiment.is_demo else "SIMPY DISCRETE-EVENT SIMULATION (Trace Verified)"
     meta_data = [
         [
             Paragraph("<b>Experiment ID:</b>", body_style), Paragraph(str(experiment.exp_code), body_style),

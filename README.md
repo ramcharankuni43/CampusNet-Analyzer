@@ -1,28 +1,30 @@
 <div align="center">
 
-# 🌐 CampusNet Analyzer
-### Network Performance Analysis of a University E-Learning System
-#### NS-2 Discrete-Event Telemetry & Protocol Engineering Suite
+# 🎓 CampusNet Analyzer
+### University Campus E-Learning Network Performance Simulator
+#### Discrete-Event Simulation, Protocol Modeling & Performance Telemetry Suite
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI_0.110+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/Frontend-React_18_+_TypeScript-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
-[![NS-2](https://img.shields.io/badge/Engine-NS--2.35_Discrete_Event-E65100.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://www.isi.edu/nsnam/ns/)
+[![SimPy](https://img.shields.io/badge/Engine-SimPy_4.1+_Discrete_Event-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://simpy.readthedocs.io)
 [![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind_CSS_v3-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/Database-SQLite_WAL_Mode-003B57.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
-[![WSL2](https://img.shields.io/badge/Platform-WSL2_Ubuntu_Supported-E95420.svg?style=for-the-badge&logo=ubuntu&logoColor=white)](https://ubuntu.com/wsl)
 
 <p align="center">
   <b>Simulate. Measure. Compare. Optimize.</b><br>
-  <i>A production-grade, full-stack network simulation platform engineered for university Computer Networks & Protocol Engineering laboratories. All results are derived from real NS-2 simulation runs.</i>
+  <i>An educational discrete-event network simulation platform engineered for Computer Networks, Protocol Engineering, and Performance Analysis laboratories.</i>
 </p>
 
 [📌 Problem Statement](#-problem-statement) •
 [🏛️ Campus Topology](#-university-e-learning-topology) •
-[⚡ Live NS-2 Pipeline](#-live-ns-2-simulation-pipeline) •
-[📊 Verified NS-2 Metrics](#-verified-ns-2-simulation-metrics) •
-[🔄 Protocol Models (GBN & Leaky Bucket)](#-academic-protocol-modeling-viva-defense) •
-[🚀 Quick Start](#-quick-start-guide-windows-localhost) •
-[📡 API Reference](#-api-specification)
+[⚡ Discrete-Event Architecture](#-discrete-event-simulation-architecture) •
+[🔄 Protocol Models](#-educational-protocol-models) •
+[📊 Verified Metrics](#-verified-performance-metrics) •
+[🚀 Quick Start](#-quick-start-guide) •
+[🐳 Docker Setup](#-docker-deployment) •
+[📄 College Report](docs/PROJECT_REPORT.md) •
+[🚀 Deployment](docs/DEPLOYMENT.md) •
+[⚠️ Scope & Limitations](#-scope--educational-limitations)
 
 ---
 
@@ -30,20 +32,26 @@
 
 ## 📌 Problem Statement
 
-A university provides online classes, video lectures, a Learning Management System (LMS), a student portal, and an examination portal. A large number of students accessing these services simultaneously generates heavy network traffic and causes congestion, packet loss, queuing delay, and reduced throughput. 
+During peak academic periods (such as live remote examinations, synchronized video lectures, and deadline submissions), hundreds of university students concurrently access central campus digital infrastructure (LMS, lecture streaming servers, examination portals).
 
-**CampusNet Analyzer** models and evaluates the effect of user load and traffic conditions on university e-learning communication using actual discrete-event **NS-2 (Network Simulator 2)** runs executed through WSL2 Ubuntu on Windows localhost.
+Contention across constrained gateway links produces severe network degradation:
+- Buffer overflow at bottleneck routers resulting in packet drops
+- Uncontrolled UDP streams starving latency-sensitive interactive sessions
+- Excessive queuing delays inflating end-to-end round-trip times
+- Collapse of effective application throughput (goodput)
+
+**CampusNet Analyzer** simulates, records, and visualizes the exact discrete-event packet dynamics of this campus e-learning network. It allows students and instructors to model diverse student concurrency levels, compare transport protocols (TCP vs UDP), analyze sliding-window flow control (Go-Back-N), evaluate traffic shaping mechanisms (Leaky Bucket), and defend performance metrics with verifiable mathematical conservation.
 
 ---
 
 ## 🏛️ University E-Learning Topology
 
-The e-learning system is modeled as a tiered campus network topology:
-- **$N$ Student Workstations / Nodes**: Students accessing classes, video streams, quizzes, and exams.
-- **Access Router ($R_1$)**: Gathers traffic from the student subnet over 10 Mbps access links (5 ms delay).
-- **Bottleneck Campus Link**: Constrained connection between Access Router $R_1$ and Core Router $R_2$ representing campus edge bandwidth limits (configurable from 256 Kbps to 5 Mbps, 20 ms propagation delay).
-- **Core Router ($R_2$)**: Manages traffic flow to internal server infrastructure.
-- **LMS Central Server**: High-speed 100 Mbps uplink (2 ms delay) hosting lecture videos, quiz engines, and study materials.
+The university e-learning network is modeled as a tiered campus architecture:
+- **$N$ Student Workstation Nodes**: University client machines running e-learning applications (configurable from 1 to 250 concurrent students).
+- **Access Router ($R_1$)**: Aggregates traffic from the student subnet over high-speed access links (10 Mbps, 5 ms delay).
+- **Bottleneck Campus Gateway Link**: Constrained connection between Access Router $R_1$ and Core Router $R_2$ representing campus gateway bandwidth limits (configurable from 256 Kbps to 5 Mbps, 20 ms delay, DropTail bounded queue).
+- **Core Router ($R_2$)**: Distributes campus backbone traffic to data center resources.
+- **LMS Central Server**: Target destination with a 100 Mbps uplink hosting lecture video feeds, quizzes, and learning materials.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -62,135 +70,233 @@ The e-learning system is modeled as a tiered campus network topology:
 
 ---
 
-## ⚡ Live NS-2 Simulation Pipeline
+## ⚡ Discrete-Event Simulation Architecture
 
-In **🟢 LIVE NS-2 SIMULATION MODE** (the system default), every metric, time-series graph, and comparison is generated by executing `ns` inside WSL2 Ubuntu and parsing the resultant event trace (`.tr`):
+CampusNet Analyzer uses **SimPy** as its primary, native discrete-event simulation engine (`SimPySimulationEngine`). It executes natively on Windows, Linux, and macOS without requiring external simulator binaries, compilers, or virtualization.
 
 ```mermaid
 flowchart TD
-    A["👤 User Selects Scenario<br/>(LOW 10, MED 50, HIGH 150, or Custom)"] --> B["⚡ FastAPI POST /api/simulations/run"]
-    B --> C["📝 Dynamic OTcl Script Generation<br/>(Topology, links, TCP/UDP agents, CBR/FTP traffic)"]
-    C --> D["⚙️ NS-2 Execution via WSL2 Ubuntu<br/>(wsl -d Ubuntu -- ns /mnt/e/.../EXP-XXX.tcl)"]
-    D --> E["📄 NS-2 Event Trace Output (.tr)<br/>(Enqueues '+', Dequeues '-', Receives 'r', Drops 'd')"]
-    E --> F["🔬 Trace Parser & Performance Engine<br/>(Throughput, Loss, Delay, PDR, Sequence trace)"]
-    F --> G["💾 SQLite Database Persistence<br/>(edunet.db WAL Mode)"]
-    G --> H["📊 React Analytics Dashboard<br/>(Interactive Recharts with zero hardcoded values)"]
+    A["👤 User Configures Simulation<br/>(Students, Protocol, Bandwidth, Delay, Time)"] --> B["⚡ FastAPI POST /api/simulations/run"]
+    B --> C["📦 SimPy Discrete-Event Engine<br/>(Student processes, DropTail queue, Link serialization)"]
+    C --> D["⏱️ Micro-Stage Telemetry Engine<br/>(6-stage progress tracking via WebSockets & polling)"]
+    D --> E["🔬 Metrics & Conservation Verification<br/>(Invariant: Sent = Delivered + Lost + In-Transit)"]
+    E --> F["💾 SQLite Database Persistence<br/>(edunet.db / campusnet.db in WAL mode)"]
+    F --> G["📊 React Analytics Dashboard<br/>(Interactive Recharts with dynamic time series)"]
 ```
 
-### Predefined University Traffic Presets
-1. **LOW Load (10 Students)**: 10 student browsing/LMS clients sharing a 512 Kbps campus bottleneck link.
-2. **MEDIUM Load (50 Students)**: 50 simultaneous lecture video & quiz clients over a 1 Mbps bottleneck.
-3. **HIGH Load (150 Students)**: 150 concurrent students during campus-wide examination peak over a 2 Mbps bottleneck link.
-4. **Custom Scenario**: Arbitrary user cohorts ($N \in [1, 250]$), custom bottleneck data rates (256 Kbps – 5 Mbps), and protocol selection (TCP NewReno vs UDP CBR).
+### Execution Modes
+1. **🟢 Real-Time Mode (SimPy Discrete-Event Simulation — Default)**:
+   - Executes the authentic SimPy discrete-event simulation engine in real time.
+   - Emits live 6-stage telemetry (`initialized` → `generating_traffic` → `simulating_queue` → `processing_metrics` → `saving_results` → `completed`).
+   - Persists all experiment parameters, summary metrics, and 1-second time-series logs directly into SQLite.
+2. **🟦 Demo Mode (Calibrated Sample Reference Data)**:
+   - Operates 100% offline using pre-calibrated laboratory sample records (DEMO-001 through DEMO-009).
+   - Designed for instant exploration, classroom presentations, or testing when backend execution is not active.
+3. **Optional Legacy NS-2 Integration**:
+   - NS-2 is maintained as an optional, secondary historical mode. If native NS-2 or WSL2 Ubuntu NS-2 is installed on the host, the system can detect it; however, **NS-2 is not required** for normal operation.
 
 ---
 
-## 📊 Verified NS-2 Simulation Metrics
+## 🔄 Educational Protocol Models
 
-The following metrics are parsed directly from real NS-2 trace files generated by the discrete-event engine in WSL2:
+CampusNet Analyzer implements faithful educational models for core networking mechanisms:
 
-### 1. Preset Scaling Analysis (Offered Load Progression)
-| Traffic Tier | Students ($N$) | Protocol | Bottleneck BW | Throughput (Kbps) | Packet Loss (%) | Avg Delay (ms) | PDR (%) |
-|:---|:---|:---|:---|:---|:---|:---|:---|
-| **LOW** | 10 | TCP | 512 Kbps | 498.27 Kbps | 11.59% | 311.84 ms | 88.41% |
-| **MEDIUM** | 50 | TCP | 1 Mbps | 960.05 Kbps | 25.71% | 219.38 ms | 74.29% |
-| **HIGH** | 150 | TCP | 2 Mbps | 1923.52 Kbps | 34.36% | 159.99 ms | 65.64% |
+### 1. TCP AIMD Congestion Control (NewReno-Style)
+- **Slow Start**: Congestion window ($cwnd$) doubles every round-trip time until reaching the slow-start threshold ($ssthresh$).
+- **Congestion Avoidance (Additive Increase)**: $cwnd$ expands linearly by 1 packet per RTT ($cwnd \leftarrow cwnd + 1/cwnd$ per ACK).
+- **Fast Retransmit & Multiplicative Decrease**: Upon detecting packet drop, $ssthresh \leftarrow \max(2, cwnd / 2)$ and $cwnd \leftarrow ssthresh$.
 
-> **Key Finding**: As student contention intensifies at the campus gateway, packet drop rates climb from 11.59% to 34.36%, reducing Packet Delivery Ratio (PDR) from 88.41% down to 65.64%.
+### 2. UDP CBR (Constant Bit Rate)
+- Transmits packets at regular intervals determined by the offered data rate without flow control or backoff.
+- Demonstrates how unresponsive UDP streams cause queue starvation and high drop rates under constrained bandwidth.
 
----
+### 3. Go-Back-N Sliding Window ARQ
+- Implements a sender sliding window of size $N$ with cumulative acknowledgments and timeout-driven retransmission.
+- Traces sequence number evolution, highlighting the characteristic saw-tooth retransmission pattern upon packet loss.
 
-### 2. Multi-Rate TCP vs UDP Comparison
-Evaluated across standard campus bandwidth allocations:
-
-| Bandwidth Rate | TCP Throughput | UDP Throughput | TCP Loss (%) | UDP Loss (%) | TCP PDR (%) | UDP PDR (%) |
-|:---|:---|:---|:---|:---|:---|:---|
-| **256 Kbps** | 249.63 Kbps | 251.20 Kbps | 46.72% | 50.93% | 53.28% | 49.07% |
-| **512 Kbps** | 499.75 Kbps | 449.54 Kbps | 31.33% | 0.00% | 68.67% | 100.00% |
-| **1 Mbps** | 960.62 Kbps | 857.09 Kbps | 26.92% | 0.00% | 73.08% | 100.00% |
-| **2 Mbps** | 1887.37 Kbps | 1691.65 Kbps | 24.60% | 0.00% | 75.40% | 100.00% |
-| **5 Mbps** | 4559.98 Kbps | 4191.23 Kbps | 15.28% | 0.00% | 84.72% | 100.00% |
+### 4. Leaky Bucket Traffic Shaper
+- Smooths bursty traffic streams by admitting packets into a bounded bucket and releasing them onto the network at a constant, uniform leak rate.
+- Directly demonstrates how traffic shaping prevents queue overflow at downstream bottleneck links.
 
 ---
 
-## 🔄 Academic Protocol Modeling (Viva Defense)
+## 📊 Verified Performance Metrics
 
-### 1. Go-Back-N ARQ Sliding Window Protocol
-- **Viva Defense Question**: *NS-2 has no built-in `Agent/GBN`. How is Go-Back-N implemented?*
-- **Accredited NS-2 Mapping**: Go-Back-N is implemented using **`Agent/TCP` (Tahoe)** paired with a cumulative **`Agent/TCPSink`**, combined with an **`ErrorModel`** inserted on the bottleneck link.
-- **Mechanics**:
-  1. The sender window is controlled via `window_` in Tcl.
-  2. The receiver accepts packets strictly in order and returns cumulative ACKs for the highest in-sequence packet received.
-  3. When a packet is dropped by the bottleneck `ErrorModel`, subsequent packets are rejected as out-of-order.
-  4. Tahoe experiences an RTO timeout or 3 duplicate ACKs, collapses `cwnd` to 1, and **retransmits starting from the lost segment forward** (the hallmark of Go-Back-N).
-  5. The sequence number vs simulation time trace is extracted and plotted to exhibit the characteristic saw-tooth retransmission curve.
+CampusNet Analyzer strictly adheres to standard academic networking formulas and maintains clear distinctions across packet accounting levels:
 
-### 2. Leaky Bucket Traffic Shaper
-- **Viva Defense Question**: *NS-2 has no built-in leaky bucket queue. How is it implemented, and why not use RED?*
-- **Accredited NS-2 Mapping**: Random Early Detection (RED) is an active queue management scheme for congestion avoidance, *not* a traffic shaper. In CampusNet Analyzer, Leaky Bucket is implemented via an **intermediate shaper node with a bounded `DropTail` queue** (limit = bucket capacity) drained at a **constant leak rate link** (e.g., 512 Kbps).
-- **Mechanics**:
-  1. Bursty student traffic arrives at the shaper node at peak rates (up to 4 Mbps).
-  2. Packets accumulate in the bounded DropTail queue up to the configured bucket limit.
-  3. Packets are drained onto the core trunk at the fixed, constant leak rate.
-  4. Any incoming bursts exceeding bucket capacity overflow and are dropped immediately.
-  5. The dashboard runs identical workloads with and without shaping to prove throughput smoothing and drop stabilization.
+### Documented Formulas & Distinctions:
+1. **Throughput / Goodput (Kbps)**:
+   $$\text{Throughput} = \frac{\text{Unique Delivered Payload Bytes} \times 8}{\text{Observation Duration (s)} \times 1000}$$
+2. **Terminal Packet Loss (%)**:
+   $$\text{Packet Loss} = \frac{\text{Unique Lost Packets}}{\text{Unique Generated Packets}} \times 100$$
+   *Note: In reliable protocols like TCP, dropped transmission attempts are retransmitted; terminal packet loss measures unique packets never delivered.*
+3. **Physical Drop Events**:
+   Total number of packet transmission attempts rejected by the bottleneck queue due to buffer overflow.
+4. **Packet Delivery Ratio (PDR %)**:
+   $$\text{PDR} = \frac{\text{Unique Delivered Packets}}{\text{Unique Generated Packets}} \times 100$$
+5. **Average End-to-End Delay (ms)**:
+   Arithmetic mean of queuing, serialization, and propagation delays across all successfully delivered packets.
+6. **Strict Conservation Invariant**:
+   $$\text{Unique Sent} = \text{Unique Delivered} + \text{Unique Lost} + \text{In-Transit}$$
 
 ---
 
-## 🚀 Quick Start Guide (Windows Localhost)
-
-The application runs 100% on localhost with zero cloud or Docker dependencies.
+## 🚀 Quick Start Guide
 
 ### Prerequisites
-1. **Windows 10/11** with **WSL2 Ubuntu** installed:
-   ```powershell
-   wsl --install -d Ubuntu
-   ```
-2. **NS-2 & Utilities** installed inside WSL2 Ubuntu:
-   ```bash
-   wsl -d Ubuntu -u root -- apt update && apt install -y ns2 nam gnuplot
-   ```
-   *Verify installation:* `wsl -d Ubuntu -- ns -v` (outputs `2.35`).
-3. **Python 3.10+** (Python 3.12, 3.13, or 3.14 via `py` launcher).
-4. **Node.js v18+**.
+- **Python 3.10+** (Python 3.11 recommended)
+- **Node.js 18+** and npm
+- **Windows 10/11**, **Linux**, or **macOS**
 
-### One-Click Launch
-Double-click or run from PowerShell:
+### Option A: One-Click Launch (Windows)
+Double-click `start.bat` in the project root:
 ```powershell
 .\start.bat
 ```
-`start.bat` will automatically:
-1. Verify / initialize the Python virtual environment in `backend/venv`.
-2. Install all dependencies from `backend/requirements.txt`.
-3. Check and install frontend packages (`npm install`).
-4. Start the FastAPI backend on **`http://127.0.0.1:8000`**.
-5. Start the Vite React frontend on **`http://localhost:5173`**.
-6. Launch your default browser to **`http://localhost:5173`**.
+This batch script automatically validates your Python virtual environment, installs backend and frontend dependencies, launches both services, and opens the application in your browser.
 
 ---
 
-## 📡 API Specification
+### Option B: Manual Setup
 
-| Method | Endpoint | Description |
-|:---|:---|:---|
-| `GET` | `/api/dashboard/summary` | Global KPIs, PDR vs Users, Multi-Rate data, and GBN/Leaky Bucket traces |
-| `POST` | `/api/simulations/run-full-analysis` | Executes full academic suite (LOW, MED, HIGH, Multi-Rate, GBN, Leaky Bucket) |
-| `POST` | `/api/simulations/run` | Triggers a custom NS-2 simulation run |
-| `GET` | `/api/simulations/{id}/status` | Live stage-by-stage execution progress |
-| `POST` | `/api/simulations/run-gbn` | Runs real NS-2 Go-Back-N simulation (Agent/TCP Tahoe) |
-| `GET` | `/api/simulations/gbn-latest` | Fetches latest Go-Back-N trace and metrics |
-| `POST` | `/api/simulations/run-leaky-bucket` | Runs paired NS-2 simulations with and without Leaky Bucket |
-| `GET` | `/api/simulations/leaky-bucket-latest` | Fetches latest Leaky Bucket comparison data |
-| `POST` | `/api/simulations/run-tcp-udp-batch` | Runs 5-rate comparative TCP vs UDP benchmarks |
-| `GET` | `/api/reports/{id}/csv` | Exports raw trace telemetry to CSV |
-| `GET` | `/api/reports/{id}/pdf` | Generates publication-grade PDF report |
+#### 1. Backend Setup
+```bash
+# Navigate to backend directory
+cd backend
 
----
+# Create and activate virtual environment
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
 
-## 🧪 Testing
+# Install dependencies
+pip install -r requirements.txt
 
-To execute the backend verification test suite (including live NS-2 sub-simulations):
-```powershell
-.\backend\venv\Scripts\pytest.exe backend/tests
+# Start FastAPI backend server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-*Current test status: 9 passed in 12.66s.*
+- API Swagger Docs: `http://127.0.0.1:8000/docs`
+- Healthcheck: `http://127.0.0.1:8000/api/health`
+- Simulator Status: `http://127.0.0.1:8000/api/system/status`
+
+#### 2. Frontend Setup
+```bash
+# In a new terminal, navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+```
+Open `http://localhost:5173` in your browser.
+
+---
+
+## 🐳 Docker Deployment
+
+CampusNet Analyzer provides a complete multi-container setup with persistent SQLite storage:
+
+```bash
+# Build and run containers
+docker-compose up -d --build
+```
+
+- **Frontend SPA**: `http://localhost:5173` (or `http://localhost`)
+- **Backend API**: `http://localhost:8000`
+- **Data Persistence**: A dedicated Docker volume `campusnet_backend_data` ensures experiment history is safely preserved across container restarts.
+
+To stop:
+```bash
+docker-compose down
+```
+
+---
+
+## 💾 SQLite Database & Backup Instructions
+
+CampusNet Analyzer exclusively utilizes **SQLite** with high-concurrency production tuning:
+- **Zero External DB Dependencies**: Strictly uses SQLite without requiring PostgreSQL, MySQL, or MongoDB.
+- **Write-Ahead Logging (WAL)**: `PRAGMA journal_mode=WAL` allows simultaneous concurrent readers while simulation workers persist metrics.
+- **Non-Blocking Timeouts**: `PRAGMA busy_timeout=5000` (5-second lock queue) and SQLAlchemy connection timeout of `30.0s`.
+- **Git Protection**: All SQLite database files (`*.db`, `*.db-shm`, `*.db-wal`) are strictly ignored by `.gitignore`.
+
+### Local Database Backup & Restore Guide:
+
+#### 1. Create a Safe Point-in-Time Backup:
+Using the SQLite online backup API ensures safe point-in-time copying even while simulations are running:
+```bash
+# Using sqlite3 CLI
+sqlite3 backend/edunet.db ".backup backend/backup_snapshot.db"
+
+# Or on Windows PowerShell:
+# Copy the primary file when simulations are idle:
+Copy-Item backend/edunet.db backend/backup_snapshot.db
+```
+
+#### 2. Restore from Backup:
+```bash
+# Stop backend server, then restore:
+cp backend/backup_snapshot.db backend/edunet.db
+
+# Or on Windows PowerShell:
+Copy-Item backend/backup_snapshot.db backend/edunet.db -Force
+```
+
+---
+
+## 🎨 Modern UI/UX Redesign & Frontend Architecture
+
+The frontend is built with React 18, TypeScript, Tailwind CSS v3, and Recharts, featuring a comprehensive design system:
+
+| Page | Route | Description |
+|---|---|---|
+| **Executive Dashboard** | `/` | Real-time KPI stat cards, system status ribbon, 8 interactive Recharts visualizations |
+| **New Simulation** | `/simulate` | Workload tier presets (Low/Medium/High/Custom), TCP/UDP radio cards, academic benchmark profile |
+| **Simulation Monitor** | `/monitor` | 6-stage telemetry stepper, live console log terminal, WebSocket with auto polling fallback |
+| **Experiment Results** | `/experiments/:id` | Detailed metric cards, mathematical conservation audit, second-by-second time series, CSV/PDF exports |
+| **TCP vs UDP Comparison** | `/tcp-udp` | Protocol architecture battle cards, multi-rate progression benchmarks (256K to 5M) |
+| **Experiment Comparison** | `/compare` | Multi-experiment comparative matrix (up to 4 runs), delta variances, automated rule-based analysis |
+| **Experiment History** | `/experiments` | Keyword search, protocol and scenario filters, batch multi-select, CSV/PDF actions |
+| **Sliding Window Visualizer**| `/sliding-window` | Interactive frame sequence buffer, bi-directional channel animation, RTO timeout simulation |
+| **Go-Back-N ARQ** | `/go-back-n` | Cumulative acknowledgment simulation, sender window rewinding, out-of-order frame discard |
+| **Leaky Bucket** | `/leaky-bucket` | Fluid dynamic buffer visualizer, burst injection, shaped vs unshaped throughput dynamics |
+| **Performance Analysis** | `/performance` | Student concurrency scaling (10 to 200 nodes), bottleneck queue saturation threshold |
+| **Network Topology** | `/topology` | Interactive 4-tier SVG campus topology diagram, clickable node inspector, queue overflow indicator |
+| **Report Hub** | `/reports` | Academic report standard structure guide, direct CSV and publication-ready PDF downloads |
+| **Diagnostics & Settings** | `/settings` | 6-card system diagnostics, SQLite WAL telemetry, clean reset tool, backup instructions |
+
+---
+
+## 🧪 Automated Testing
+
+CampusNet Analyzer includes extensive verification test suites covering the SimPy simulation engine, API endpoints, telemetry lifecycle, and frontend interfaces:
+
+```bash
+# Run backend test suite (Python / pytest)
+pytest backend/tests/test_backend.py backend/tests/test_simpy_engine.py backend/tests/test_phase_3a_integration.py backend/tests/test_phase_3b_api.py backend/tests/test_phase_3d_stabilization.py -v
+
+# Run frontend test suite (Node test runner)
+cd frontend
+npm test
+
+# Verify TypeScript compilation
+npx tsc --noEmit
+
+# Run end-to-end integration benchmark
+python backend/tests/verify_e2e_frontend_backend.py
+```
+
+---
+
+## ⚠️ Scope & Educational Limitations
+
+CampusNet Analyzer is an **educational network simulation platform** designed for computer science laboratory coursework, protocol analysis, and viva defense demonstrations:
+
+- **Intended Purpose**: Visualizing queue contention, packet drops, sliding window dynamics, and protocol trade-offs under varying concurrency levels.
+- **Queue Model**: Bounded DropTail FIFO queue modeling buffer overflow at the campus gateway.
+- **Transport Models**: Simplified educational state machines for TCP AIMD (congestion window evolution, additive increase, multiplicative decrease) and UDP CBR.
+- **Not a Kernel TCP/IP Stack**: Does not implement raw socket packet manipulation, complete RFC-compliant TCP option headers (SACK, timestamps), or BGP/OSPF dynamic routing.

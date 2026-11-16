@@ -23,7 +23,7 @@ export const SimulationModeProvider: React.FC<{ children: React.ReactNode }> = (
     if (saved === 'demo' || saved === 'DEMO') {
       return 'demo';
     }
-    return 'realtime'; // Live NS-2 Mode is the primary default
+    return 'realtime'; // Live SimPy Mode is the primary default
   });
 
   const [modeVersion, setModeVersion] = useState<number>(0);
@@ -104,7 +104,7 @@ export const ModeSelector: React.FC<{ className?: string; compact?: boolean }> =
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900'
           }`}
-          title="Switch to Real-Time NS-2 Mode (Actual discrete-event simulation pipeline)"
+          title="Switch to Real-Time SimPy Mode (Actual discrete-event simulation pipeline)"
         >
           <span className={`w-2 h-2 rounded-full ${mode === 'realtime' ? 'bg-white animate-pulse' : 'bg-slate-400'}`}></span>
           LIVE
@@ -160,8 +160,8 @@ export const ModeSelector: React.FC<{ className?: string; compact?: boolean }> =
 
       <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed">
         {mode === 'demo'
-          ? 'Runs completely offline using pre-calibrated laboratory sample records. No NS-2 or backend simulation service required.'
-          : 'Executes actual discrete-event simulations via the native/WSL NS-2 pipeline and reads real trace metrics.'}
+          ? 'Runs completely offline using pre-calibrated laboratory sample records. No simulator or backend simulation service required.'
+          : 'Executes actual discrete-event simulations via the verified SimPy discrete-event engine and persists real trace metrics.'}
       </p>
     </div>
   );
@@ -178,7 +178,7 @@ export const ModeBadge: React.FC<{ isDemo?: boolean; className?: string }> = ({ 
     return (
       <span
         className={`inline-flex items-center gap-1.5 font-mono font-bold text-[10px] uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 ${className}`}
-        title="Predefined demonstration benchmark — Sample evaluation for environments without native NS-2"
+        title="Predefined demonstration benchmark — Calibrated sample evaluation"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
         DEMO BENCHMARK
@@ -189,10 +189,10 @@ export const ModeBadge: React.FC<{ isDemo?: boolean; className?: string }> = ({ 
   return (
     <span
       className={`inline-flex items-center gap-1.5 font-mono font-bold text-[10px] uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300 ${className}`}
-      title="Freshly executed and parsed from real NS-2 trace events"
+      title="Freshly executed and verified via SimPy discrete-event engine"
     >
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-      LIVE NS-2 TRACE
+      SIMPY VERIFIED
     </span>
   );
 };

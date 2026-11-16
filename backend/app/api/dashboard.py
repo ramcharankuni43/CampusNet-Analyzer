@@ -9,6 +9,7 @@ from ..models import Experiment, Result
 from ..schemas import DashboardSummary, DashboardKPIs, ExperimentResponse, ResultResponse
 from ..services.simulation_service import (
     check_ns2_installation,
+    check_simulation_engine,
     latest_gbn_result,
     latest_leaky_bucket_result
 )
@@ -201,13 +202,14 @@ def get_dashboard_summary(mode: Optional[str] = None, db: Session = Depends(get_
         "count": len(all_udp)
     }
 
+    sim_info = check_simulation_engine()
     ns_info = check_ns2_installation()
     if mode and mode.lower() in ("realtime", "live"):
-        mode_str = "NS-2 LIVE SIMULATION" if ns_info["installed"] else "REAL-TIME SIMULATION (NS-2 Required)"
+        mode_str = "SimPy Discrete-Event Simulation" if sim_info.get("operational") else "SIMULATION ENGINE OFFLINE"
     elif mode and mode.lower() == "demo":
         mode_str = "DEMO MODE — Sample Data"
     else:
-        mode_str = "NS-2 LIVE SIMULATION" if ns_info["installed"] else "DEMO MODE — Sample Data"
+        mode_str = "SimPy Discrete-Event Simulation" if sim_info.get("operational") else "DEMO MODE — Sample Data"
 
     gbn_data = latest_gbn_result.get("trace_points") if latest_gbn_result else None
 

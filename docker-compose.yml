@@ -5,16 +5,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: edunet_backend
+    container_name: campusnet_backend
     ports:
       - "8000:8000"
     volumes:
+      - backend_data:/app/data
       - ./simulation:/app/simulation
       - ./reports:/app/reports
     environment:
       - PYTHONUNBUFFERED=1
       - CORS_ORIGINS=*
       - PORT=8000
+      - DATA_DIR=/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 15s
@@ -27,7 +29,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: edunet_frontend
+    container_name: campusnet_frontend
     ports:
       - "80:80"
       - "5173:80"
@@ -35,3 +37,7 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  backend_data:
+    name: campusnet_backend_data

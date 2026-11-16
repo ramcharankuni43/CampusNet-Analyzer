@@ -12,11 +12,18 @@ import {
   Plus,
   RefreshCw,
   AlertCircle,
-  PlayCircle
+  PlayCircle,
+  X,
+  Layers
 } from 'lucide-react';
 import { useDataService } from '../services/dataService';
+import { api } from '../services/api';
 import { Experiment } from '../types';
 import { ModeBadge, useSimulationMode } from '../context/SimulationModeContext';
+import { PageHeader } from '../components/PageHeader';
+import { Card } from '../components/Card';
+import { ProtocolBadge, StatusBadge } from '../components/Badge';
+import { EmptyState } from '../components/EmptyState';
 
 export const ExperimentHistory: React.FC = () => {
   const navigate = useNavigate();
@@ -50,7 +57,6 @@ export const ExperimentHistory: React.FC = () => {
     }
   };
 
-  // Clear selections and reload when active mode or filters change
   useEffect(() => {
     setSelectedIds([]);
     fetchExperiments();
@@ -68,7 +74,6 @@ export const ExperimentHistory: React.FC = () => {
       setExperiments((prev) => prev.filter((e) => e.id !== id));
       setSelectedIds((prev) => prev.filter((selId) => selId !== id));
     } catch (err: any) {
-      // In demo mode or if server failed
       setExperiments((prev) => prev.filter((e) => e.id !== id));
       setSelectedIds((prev) => prev.filter((selId) => selId !== id));
     }
@@ -95,316 +100,243 @@ export const ExperimentHistory: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h2 className="text-base font-bold text-[#0F172A]">Experiment Records & History</h2>
-            <ModeBadge isDemo={isDemo} />
-          </div>
-          <p className="text-xs text-[#64748B]">
-            {isDemo
-              ? 'Displaying predefined laboratory demonstration records (DEMO-001 through DEMO-009)'
-              : 'Displaying live discrete-event NS-2 simulation records (EXP-xxx)'}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {selectedIds.length >= 2 && (
-            <button
-              onClick={handleCompareSelected}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-all shadow-xs"
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Page Header */}
+      <PageHeader
+        title="Experiment History & Records Archive"
+        description="Search, filter, compare, export, and manage discrete-event simulation records"
+        icon={History}
+        badge={<ModeBadge isDemo={isDemo} />}
+        actions={
+          <div className="flex items-center gap-2.5">
+            <Link
+              to="/simulate"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
             >
-              <GitCompare className="w-4 h-4" />
-              <span>Compare Selected ({selectedIds.length})</span>
-            </button>
-          )}
+              <Plus className="w-4 h-4" />
+              <span>New Simulation</span>
+            </Link>
+          </div>
+        }
+      />
 
-          <Link
-            to="/simulate"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-all shadow-sm shadow-blue-200"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Simulation</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Filter Ribbon */}
-      <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 max-w-sm">
-          <div className="relative w-full">
+      {/* Filter and Search Ribbon */}
+      <Card
+        title="Filter & Search Records"
+        subtitle="Narrow by protocol, academic scenario, or keyword"
+        icon={Filter}
+      >
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          {/* Keyword Search */}
+          <div className="relative sm:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder={isDemo ? 'Search demo experiments (e.g. DEMO-009)...' : 'Search live experiments (e.g. EXP-001)...'}
+              placeholder="Search by experiment code, name, or description..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#F8FAFC]"
+              className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
             />
-          </div>
-          <button
-            type="submit"
-            className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-          >
-            Search
-          </button>
-        </form>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Active Mode Indicator */}
-          <div className="hidden sm:flex items-center">
-            {isDemo ? (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-mono font-bold">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                DEMO DATASET
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-mono font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                LIVE NS-2 DATABASE
-              </span>
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  fetchExperiments();
+                }}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
 
           {/* Protocol Filter */}
-          <select
-            value={protocolFilter}
-            onChange={(e) => setProtocolFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium text-slate-700"
-          >
-            <option value="">All Protocols</option>
-            <option value="TCP">TCP (NewReno)</option>
-            <option value="UDP">UDP (CBR)</option>
-          </select>
+          <div>
+            <select
+              value={protocolFilter}
+              onChange={(e) => setProtocolFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Protocols (TCP & UDP)</option>
+              <option value="TCP">TCP Only</option>
+              <option value="UDP">UDP Only</option>
+            </select>
+          </div>
 
           {/* Scenario Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium text-slate-700"
-          >
-            <option value="">All Scenarios</option>
-            <option value="Normal Traffic">Normal Traffic</option>
-            <option value="High Traffic">High Traffic</option>
-            <option value="TCP vs UDP">TCP vs UDP</option>
-            <option value="Leaky Bucket">Leaky Bucket</option>
-            <option value="Sliding Window">Sliding Window</option>
-            <option value="Go-Back-N">Go-Back-N</option>
-          </select>
-
-          <button
-            onClick={() => fetchExperiments()}
-            className="p-1.5 text-slate-500 hover:text-[#0F172A] rounded-lg border border-[#CBD5E1] hover:bg-slate-50 transition-colors"
-            title="Refresh List"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span>{error}</span>
+          <div>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Scenarios</option>
+              <option value="Online Classroom">Online Classroom</option>
+              <option value="Normal Traffic">Normal Traffic</option>
+              <option value="High Traffic">High Traffic</option>
+              <option value="TCP vs UDP">TCP vs UDP</option>
+              <option value="Leaky Bucket">Leaky Bucket</option>
+              <option value="Sliding Window">Sliding Window</option>
+              <option value="Go-Back-N">Go-Back-N</option>
+            </select>
           </div>
-          <div className="flex items-center gap-2">
-            {!isDemo && (
-              <button
-                onClick={() => setMode('demo')}
-                className="underline font-semibold text-blue-700 hover:text-blue-900"
-              >
-                Use Demo Mode (Sample Data)
-              </button>
-            )}
-            <button onClick={fetchExperiments} className="underline font-semibold hover:text-amber-950">
-              Retry
+        </form>
+      </Card>
+
+      {/* Multi-Selection Sticky Bar */}
+      {selectedIds.length > 0 && (
+        <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <span className="w-6 h-6 rounded-full bg-white/20 text-white font-mono text-xs font-bold flex items-center justify-center">
+              {selectedIds.length}
+            </span>
+            <span className="text-xs font-bold">
+              {selectedIds.length} {selectedIds.length === 1 ? 'experiment' : 'experiments'} selected for multi-run comparison
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"
+            >
+              Deselect All
+            </button>
+            <button
+              onClick={handleCompareSelected}
+              disabled={selectedIds.length < 2}
+              className="px-4 py-1.5 rounded-xl bg-white text-blue-700 hover:bg-blue-50 disabled:opacity-50 text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <GitCompare className="w-3.5 h-3.5" />
+              <span>Compare Selected ({selectedIds.length})</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Experiments Table */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8FAFC] text-[#64748B] font-semibold border-b border-[#E2E8F0]">
-              <tr>
-                <th className="p-4 w-10 text-center">
-                  <span className="sr-only">Select</span>
-                </th>
-                <th className="px-4 py-3">ID</th>
-                <th className="px-4 py-3">Experiment</th>
-                <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">Configuration</th>
-                <th className="px-4 py-3">Protocol</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Throughput</th>
-                <th className="px-4 py-3">Packet Loss</th>
-                <th className="px-4 py-3">Delay</th>
-                <th className="px-4 py-3">PDR</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E2E8F0]">
-              {loading && (
-                <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
-                    <span>Loading {isDemo ? 'demo' : 'real-time'} experiment records...</span>
-                  </td>
+      {/* Records Table */}
+      <Card
+        title="Archived Experiments"
+        subtitle={`${experiments.length} total records logged`}
+        icon={Layers}
+      >
+        {loading ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-500">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-xs font-bold text-slate-700">Loading archived experiments...</span>
+          </div>
+        ) : experiments.length === 0 ? (
+          <EmptyState
+            title="No Experiments Found"
+            description="No experiment records match your active filters or search terms."
+            icon={History}
+            actionLabel="Reset Filters"
+            onAction={() => {
+              setSearch('');
+              setProtocolFilter('');
+              setTypeFilter('');
+              fetchExperiments();
+            }}
+          />
+        ) : (
+          <div className="overflow-x-auto -mx-5 -mb-5">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                  <th className="px-4 py-3.5 text-center w-10">Select</th>
+                  <th className="px-4 py-3.5">Code</th>
+                  <th className="px-4 py-3.5">Experiment Details</th>
+                  <th className="px-4 py-3.5">Protocol</th>
+                  <th className="px-4 py-3.5">Nodes</th>
+                  <th className="px-4 py-3.5">Throughput</th>
+                  <th className="px-4 py-3.5">Loss</th>
+                  <th className="px-4 py-3.5">PDR</th>
+                  <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5 text-right">Actions</th>
                 </tr>
-              )}
-
-              {!loading && experiments.length === 0 && (
-                <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-500">
-                    <div className="max-w-md mx-auto space-y-3">
-                      <p className="font-semibold text-slate-700">
-                        {isDemo
-                          ? 'No demo experiments found matching your filters.'
-                          : 'No real-time NS-2 simulations recorded yet.'}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {isDemo
-                          ? 'Clear your filters to view the predefined laboratory benchmarks.'
-                          : 'Run a live NS-2 simulation to generate discrete-event traces, or switch to Demo Mode to view predefined datasets.'}
-                      </p>
-                      <div className="pt-2 flex items-center justify-center gap-3">
-                        {!isDemo && (
-                          <button
-                            type="button"
-                            onClick={() => setMode('demo')}
-                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs"
-                          >
-                            Use Demo Mode (Sample Data)
-                          </button>
-                        )}
-                        <Link
-                          to="/simulate"
-                          className="px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-xs transition-colors"
-                        >
-                          New Simulation
-                        </Link>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {!loading &&
-                experiments.map((exp) => {
-                  const isSelected = selectedIds.includes(exp.id);
-                  const createdAtDate = new Date(exp.created_at);
-                  const formattedDate = !isNaN(createdAtDate.getTime())
-                    ? createdAtDate.toLocaleDateString()
-                    : 'Predefined';
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono">
+                {experiments.map((exp) => {
+                  const isChecked = selectedIds.includes(exp.id);
+                  const isFailed = exp.status?.toLowerCase() === 'failed';
+                  const res = exp.result;
 
                   return (
                     <tr
                       key={exp.id}
-                      className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}
+                      className={`hover:bg-slate-50/70 transition-colors ${
+                        isChecked ? 'bg-blue-50/40' : ''
+                      }`}
                     >
-                      <td className="p-4 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         <input
                           type="checkbox"
-                          checked={isSelected}
+                          checked={isChecked}
                           onChange={() => handleToggleSelect(exp.id)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
                         />
                       </td>
-                      <td className="px-4 py-3 font-mono font-bold text-blue-700 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-bold text-blue-700">
                         <Link to={`/experiments/${exp.id}`} className="hover:underline">
                           {exp.exp_code}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 font-medium text-[#0F172A] max-w-xs">
-                        <div className="truncate font-semibold">{exp.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate">{exp.experiment_type}</div>
+                      <td className="px-4 py-3.5 font-sans">
+                        <div className="font-bold text-slate-800">{exp.name}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {exp.experiment_type} • {exp.data_rate} • {exp.simulation_time}s
+                        </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <ModeBadge isDemo={exp.is_demo} />
+                      <td className="px-4 py-3.5">
+                        <ProtocolBadge protocol={exp.protocol} />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-[#334155]">
-                        <div><strong>{exp.users}</strong> nodes &bull; {exp.data_rate}</div>
-                        <div className="text-[10px] text-slate-400">Delay: {exp.delay || '20ms'} &bull; {exp.traffic_level}</div>
+                      <td className="px-4 py-3.5 text-slate-600">
+                        {exp.users} nodes
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
-                            exp.protocol === 'TCP'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
-                        >
-                          {exp.protocol}
-                        </span>
+                      <td className="px-4 py-3.5 font-bold text-slate-900">
+                        {res ? `${res.throughput_kbps} Kbps` : '—'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {String(exp.status).toLowerCase() === 'completed' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            COMPLETED
-                          </span>
-                        ) : String(exp.status).toLowerCase() === 'failed' ? (
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200"
-                            title={exp.error_message || 'Execution Failed'}
-                          >
-                            FAILED
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            {exp.status.toUpperCase()}
-                          </span>
-                        )}
+                      <td className="px-4 py-3.5 font-semibold text-rose-600">
+                        {res ? `${res.packet_loss_percent}%` : '—'}
                       </td>
-                      <td className="px-4 py-3 font-mono font-semibold text-[#0F172A] whitespace-nowrap">
-                        {exp.result ? `${exp.result.throughput_kbps} Kbps` : '—'}
+                      <td className="px-4 py-3.5 font-bold text-emerald-700">
+                        {res ? `${res.packet_delivery_ratio}%` : '—'}
                       </td>
-                      <td className="px-4 py-3 font-mono text-rose-600 font-semibold whitespace-nowrap">
-                        {exp.result ? `${exp.result.packet_loss_percent}%` : '—'}
+                      <td className="px-4 py-3.5">
+                        <StatusBadge status={exp.status} />
                       </td>
-                      <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
-                        {exp.result ? `${exp.result.average_delay_ms} ms` : '—'}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-emerald-700 font-semibold whitespace-nowrap">
-                        {exp.result ? `${exp.result.packet_delivery_ratio}%` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
-                        {formattedDate}
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="px-4 py-3.5 text-right font-sans">
+                        <div className="flex items-center justify-end gap-2">
                           <Link
                             to={`/experiments/${exp.id}`}
-                            className="px-2 py-1 text-[11px] font-semibold text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 rounded transition-colors"
-                            title="View Details"
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs transition-colors"
                           >
-                            View
+                            Analytics
                           </Link>
-                          <Link
-                            to={`/compare?primary=${exp.id}`}
-                            className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-white hover:bg-slate-700 border border-slate-200 rounded transition-colors"
-                            title="Compare"
-                          >
-                            Compare
-                          </Link>
-                          <a
-                            href={dataService.getReportCsvUrl(exp.id)}
-                            download
-                            className="px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:text-white hover:bg-emerald-600 border border-emerald-200 rounded transition-colors"
-                            title="Export CSV"
-                          >
-                            Export
-                          </a>
+                          {res && (
+                            <>
+                              <a
+                                href={api.getReportCsvUrl(exp.id)}
+                                download
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                title="Export CSV"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </a>
+                              <a
+                                href={api.getReportPdfUrl(exp.id)}
+                                download
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                title="Export PDF"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </a>
+                            </>
+                          )}
                           <button
                             onClick={() => handleDelete(exp.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                            title="Delete Experiment"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete Record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -413,10 +345,13 @@ export const ExperimentHistory: React.FC = () => {
                     </tr>
                   );
                 })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
+
+export default ExperimentHistory;

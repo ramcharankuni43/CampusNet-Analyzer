@@ -1,6 +1,6 @@
 # ==============================================================================
-# EduNet Analyzer - Production Unified Dockerfile
-# Full-Stack: React 18 (Vite) + FastAPI + NS-2 (Network Simulator 2)
+# CampusNet Analyzer - Production Unified Dockerfile
+# Full-Stack: React 18 (Vite) + FastAPI + SimPy Discrete-Event Simulation Engine
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ------------------------------------------------------------------------------
-# Stage 2: Production Runtime with NS-2 & Python Backend
+# Stage 2: Production Runtime with SimPy & Python Backend
 # ------------------------------------------------------------------------------
 FROM python:3.11-slim AS runner
 
@@ -26,21 +26,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
     HOST=0.0.0.0 \
+    DATA_DIR=/app/data \
     STATIC_DIR=/app/frontend/dist \
     SIMULATION_DIR=/app/simulation
 
 WORKDIR /app
 
-# Install system utilities, build tools, and NS-2 simulation engine
+# Install system utilities (curl for container healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
-    ns2 \
-    nam \
     && rm -rf /var/lib/apt/lists/*
-
-# Verify NS-2 discrete-event simulator availability
-RUN ns -v || true
 
 # Install Python backend dependencies
 COPY backend/requirements.txt ./requirements.txt
@@ -52,8 +47,8 @@ COPY backend/ /app/backend
 # Copy compiled frontend assets from Stage 1
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
-# Prepare simulation and report storage directories
-RUN mkdir -p /app/simulation/generated /app/simulation/traces /app/reports
+# Prepare data, simulation and report storage directories
+RUN mkdir -p /app/data /app/simulation/generated /app/simulation/traces /app/reports
 
 # Default HTTP/WebSocket port
 EXPOSE 8000

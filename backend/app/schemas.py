@@ -52,6 +52,9 @@ class TimeSeriesPoint(BaseModel):
     throughput_kbps: float
     delay_ms: float
     packets_dropped: int
+    packet_loss_percent: Optional[float] = None
+    attempt_drop_percent: Optional[float] = None
+    queue_occupancy: Optional[float] = None
 
 class ResultBase(BaseModel):
     throughput_kbps: float

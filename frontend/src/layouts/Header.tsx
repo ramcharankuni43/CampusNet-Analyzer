@@ -52,23 +52,23 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-[#E2E8F0] px-3 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-3 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs">
       {/* Left: Mobile Menu Toggle & Page Titles */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="lg:hidden p-1.5 sm:p-2 -ml-1 rounded-lg text-slate-600 hover:text-[#0F172A] hover:bg-slate-100 transition-colors flex-shrink-0"
+          className="lg:hidden p-2 -ml-1 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors flex-shrink-0"
           aria-label="Toggle navigation menu"
         >
           <Menu className="w-5 h-5" />
         </button>
         <div className="min-w-0">
-          <h2 className="text-sm sm:text-base font-bold text-[#0F172A] tracking-tight truncate">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
             {getPageTitle()}
           </h2>
-          <p className="text-[10px] sm:text-[11px] text-[#64748B] truncate hidden sm:block">
-            Computer Networks & Internet Protocols Lab — Project #4
+          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate hidden sm:block">
+            Computer Networks & Internet Protocols Lab — Discrete-Event Performance Telemetry
           </p>
         </div>
       </div>
@@ -76,8 +76,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       {/* Right: Controls & Actions */}
       <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 flex-shrink-0">
         {/* Global Simulation Mode Selector */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden xl:inline">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden xl:inline font-mono">
             Mode:
           </span>
           <ModeSelector compact />
@@ -86,13 +86,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         {/* Mode Status Pill */}
         <div className="hidden md:flex items-center">
           {isDemo ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               <span>DEMO MODE</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>{status?.simulator_operational ? 'SIMPY ENGINE' : (status?.ns2_installed ? 'LIVE NS-2' : 'REALTIME')}</span>
             </div>
           )}
@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         {location.pathname !== '/simulation/new' && location.pathname !== '/simulate' && (
           <Link
             to="/simulation/new"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all shadow-sm shadow-blue-200"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all shadow-xs shadow-blue-500/20 hover:scale-[1.02]"
           >
             <Plus className="w-4 h-4 flex-shrink-0" />
             <span className="hidden sm:inline">New Simulation</span>

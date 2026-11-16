@@ -36,7 +36,7 @@ def trigger_simulation(
         counter += 1
         exp_code = f"EXP-{counter:03d}"
 
-    # If user explicitly selected demo mode, set is_demo=True, otherwise keep False for Live NS-2 run
+    # If user explicitly selected demo mode, set is_demo=True, otherwise keep False for Live SimPy discrete-event execution
     is_demo = bool(config.force_demo)
 
     exp = Experiment(
@@ -140,16 +140,16 @@ def compare_simulations_post(request: ComparisonRequest, db: Session = Depends(g
 
 @router.post("/run-full-analysis")
 async def trigger_full_analysis():
-    """Executes the complete academic suite of NS-2 simulations across all presets and protocols."""
+    """Executes the complete academic suite of simulations across all presets and protocols."""
     try:
         results = await run_full_analysis_pipeline(SessionLocal)
-        return {"message": "Full NS-2 analysis suite completed successfully", "results": results}
+        return {"message": "Full simulation analysis suite completed successfully", "results": results}
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
 @router.post("/run-gbn", response_model=GbnSimulationResponse)
 async def trigger_gbn_simulation(config: GbnSimulationRequest):
-    """Runs a live NS-2 Go-Back-N simulation (Agent/TCP Tahoe) with packet drops and retransmissions."""
+    """Runs a Go-Back-N discrete-event simulation with packet drops and retransmissions."""
     try:
         res = await run_gbn_simulation(
             window_size=config.window_size,
@@ -169,7 +169,7 @@ def get_latest_gbn():
 
 @router.post("/run-leaky-bucket", response_model=LeakyBucketResponse)
 async def trigger_leaky_bucket_simulation(config: LeakyBucketRequest):
-    """Runs paired live NS-2 simulations for bursty traffic with and without Leaky Bucket shaping."""
+    """Runs paired simulations for bursty traffic with and without Leaky Bucket shaping."""
     try:
         res = await run_leaky_bucket_simulation(
             bucket_size=config.bucket_size,
@@ -189,7 +189,7 @@ def get_latest_leaky_bucket():
 
 @router.post("/run-tcp-udp-batch")
 async def trigger_tcp_udp_batch():
-    """Runs live NS-2 multi-rate benchmarks (256K, 512K, 1M, 2M, 5M) for TCP vs UDP."""
+    """Runs multi-rate benchmarks (256K, 512K, 1M, 2M, 5M) for TCP vs UDP."""
     try:
         table = await run_tcp_udp_comparison_batch(SessionLocal)
         return {"message": "TCP vs UDP multi-rate benchmarks completed successfully", "data": table}

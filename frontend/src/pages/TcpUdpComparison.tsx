@@ -11,7 +11,8 @@ import {
   Info,
   PlayCircle,
   Clock,
-  Activity
+  Activity,
+  Plus
 } from 'lucide-react';
 import {
   BarChart,
@@ -29,6 +30,10 @@ import { api } from '../services/api';
 import { useDataService } from '../services/dataService';
 import { Experiment } from '../types';
 import { ModeBadge, useSimulationMode } from '../context/SimulationModeContext';
+import { PageHeader } from '../components/PageHeader';
+import { Card } from '../components/Card';
+import { ProtocolBadge } from '../components/Badge';
+import { CustomTooltip } from '../components/CustomTooltip';
 
 export const TcpUdpComparison: React.FC = () => {
   const { mode, isDemo, setMode } = useSimulationMode();
@@ -106,249 +111,274 @@ export const TcpUdpComparison: React.FC = () => {
     : [];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E2E8F0]">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-[#0F172A] tracking-tight">
-              TCP vs UDP Protocol Performance Analysis
-            </h1>
-            <ModeBadge />
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header Banner */}
+      <PageHeader
+        title="TCP vs UDP Protocol Performance Analysis"
+        description="Comparative evaluation of Connection-Oriented Flow Control (TCP NewReno) vs Connectionless Streaming (UDP CBR) under bottleneck congestion"
+        icon={ArrowRightLeft}
+        badge={<ModeBadge isDemo={isDemo} />}
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleRunBatch}
+              disabled={isRunningBatch || isDemo}
+              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+              title={isDemo ? 'Switch to Live Mode to run' : 'Execute multi-rate benchmark simulations'}
+            >
+              <PlayCircle className="w-4 h-4" />
+              <span>{isRunningBatch ? 'Running 5 Rates...' : 'Run Multi-Rate Benchmark'}</span>
+            </button>
+            <Link
+              to="/simulate"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Single Simulation</span>
+            </Link>
           </div>
-          <p className="text-xs text-[#64748B] mt-1">
-            Comparative evaluation of Connection-Oriented Flow Control (TCP NewReno) vs Connectionless Streaming (UDP CBR) under bottleneck congestion.
-          </p>
-        </div>
+        }
+      />
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleRunBatch}
-            disabled={isRunningBatch || isDemo}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition"
-            title={isDemo ? 'Switch to Live NS-2 mode to run' : 'Execute 5 NS-2 runs in WSL2'}
-          >
-            <PlayCircle className="w-4 h-4" />
-            <span>{isRunningBatch ? 'Running 5 Rates...' : 'Run NS-2 Multi-Rate Benchmark'}</span>
-          </button>
-          <Link
-            to="/simulate"
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
-          >
-            Launch Single Experiment
-          </Link>
-        </div>
-      </div>
-
-      {/* Batch Status Notification */}
+      {/* Batch Notification Banner */}
       {batchMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-            <span>{batchMessage}</span>
+        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs text-emerald-900 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="font-semibold">{batchMessage}</span>
           </div>
         </div>
       )}
 
-      {/* Empty State when live without runs */}
+      {/* Empty State Banner */}
       {!isDemo && comparisonData.length === 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
-          <span>No live NS-2 multi-rate records in database. Click &ldquo;Run NS-2 Multi-Rate Benchmark&rdquo; to execute all 5 rate simulations now.</span>
+        <div className="p-5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <span>No multi-rate simulation records in the database yet. Click &ldquo;Run Multi-Rate Benchmark&rdquo; to execute all 5 bottleneck rate simulations.</span>
           <button
             onClick={handleRunBatch}
             disabled={isRunningBatch}
-            className="px-3 py-1 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700 transition"
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition shadow-xs self-start sm:self-auto shrink-0"
           >
             Run Now
           </button>
         </div>
       )}
 
-      {/* Protocol Feature Matrix */}
+      {/* Protocol Architecture Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* TCP Card */}
-        <div className="p-5 bg-white rounded-xl border border-blue-200 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-bl-full pointer-events-none" />
+        {/* TCP Architecture Card */}
+        <div className="p-5 bg-white rounded-2xl border border-blue-200/90 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-blue-500/5 rounded-bl-full pointer-events-none" />
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                TCP
-              </div>
+              <ProtocolBadge protocol="TCP" />
               <div>
-                <h3 className="text-sm font-bold text-[#0F172A]">TCP (Agent/TCP/NewReno)</h3>
-                <span className="text-[11px] text-slate-500 font-medium">Reliable • Sliding Window • AIMD Congestion Control</span>
+                <h3 className="text-sm font-bold text-slate-900">TCP (NewReno AIMD)</h3>
+                <span className="text-[11px] text-slate-500">Sliding Window • Congestion Control • Reliable Retransmission</span>
               </div>
             </div>
             <ShieldCheck className="w-5 h-5 text-blue-600" />
           </div>
 
-          <p className="text-xs text-slate-600 mb-3 leading-relaxed">
-            Uses additive-increase multiplicative-decrease (AIMD) congestion window management. Automatically reduces transmission rate upon detecting packet drop at Access Router R1 to avoid collapse.
+          <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+            Employs additive-increase multiplicative-decrease (AIMD) congestion control. Dynamically scales transmission window inflight, backing off exponentially upon packet drop detection at Router R1.
           </p>
 
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Flow Control:</span> <strong>Sliding Window</strong>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Flow Control</span>
+              <strong className="text-slate-800">Sliding Window</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Loss Recovery:</span> <strong>Fast Retransmit</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Loss Recovery</span>
+              <strong className="text-slate-800">Fast Retransmit</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Typical PDR:</span> <strong className="text-emerald-600">92% – 99%</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Typical PDR</span>
+              <strong className="text-emerald-700 font-mono">92% – 99%</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Queue Policy:</span> <strong>Backs off on Drop</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Buffer Policy</span>
+              <strong className="text-slate-800">Backs Off on Drop</strong>
             </div>
           </div>
         </div>
 
-        {/* UDP Card */}
-        <div className="p-5 bg-white rounded-xl border border-purple-200 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full pointer-events-none" />
+        {/* UDP Architecture Card */}
+        <div className="p-5 bg-white rounded-2xl border border-amber-200/90 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/5 rounded-bl-full pointer-events-none" />
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
-                UDP
-              </div>
+              <ProtocolBadge protocol="UDP" />
               <div>
-                <h3 className="text-sm font-bold text-[#0F172A]">UDP (Agent/UDP + Application/Traffic/CBR)</h3>
-                <span className="text-[11px] text-slate-500 font-medium">Connectionless • Constant Bit Rate • Zero Backoff</span>
+                <h3 className="text-sm font-bold text-slate-900">UDP (Constant Bit Rate)</h3>
+                <span className="text-[11px] text-slate-500">Connectionless • Fixed Bitrate • Zero Sender Backoff</span>
               </div>
             </div>
-            <Zap className="w-5 h-5 text-purple-600" />
+            <Zap className="w-5 h-5 text-amber-600" />
           </div>
 
-          <p className="text-xs text-slate-600 mb-3 leading-relaxed">
-            Transmits packets at a fixed constant rate regardless of downstream queue status. Offers lower end-to-end latency but suffers severe packet drops during bottleneck congestion.
+          <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+            Transmits packets at an unthrottled constant rate without regard to bottleneck queue depth. Provides minimal delay under low traffic, but causes queue buffer collapse and heavy packet loss under load.
           </p>
 
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Flow Control:</span> <strong>None (Unregulated)</strong>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Flow Control</span>
+              <strong className="text-slate-800">None (Unthrottled)</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Loss Recovery:</span> <strong>No Retransmission</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Loss Recovery</span>
+              <strong className="text-slate-800">No Retransmission</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Typical PDR:</span> <strong className="text-rose-600">75% – 91%</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Typical PDR</span>
+              <strong className="text-rose-700 font-mono">71% – 91%</strong>
             </div>
-            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-              <span className="text-slate-500">Latency:</span> <strong className="text-blue-600">Minimal / Constant</strong>
+            <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Latency Profile</span>
+              <strong className="text-blue-700">Minimal / Fixed</strong>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Comparison Charts */}
+      {/* 4 Multi-Rate Comparison Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 1: Throughput Comparison */}
-        <div className="p-5 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#0F172A]">Throughput Comparison (Kbps)</h3>
-              <p className="text-[11px] text-slate-500">UDP vs TCP aggregate received throughput</p>
-            </div>
-            <TrendingUp className="w-4 h-4 text-blue-600" />
-          </div>
+        <Card
+          title="Throughput Comparison (Kbps)"
+          subtitle="UDP vs TCP aggregate received throughput across bottleneck capacities"
+          icon={TrendingUp}
+        >
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <BarChart data={comparisonData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                 <XAxis dataKey="rate" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit=" Kbps" />
-                <Tooltip />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip unit="Kbps" />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="tcpThroughput" name="TCP Throughput (Kbps)" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="udpThroughput" name="UDP Throughput (Kbps)" fill="#9333EA" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="tcpThroughput" name="TCP (Kbps)" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="udpThroughput" name="UDP (Kbps)" fill="#D97706" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-200">
-            <strong>Key Insight:</strong> UDP achieves slightly higher raw throughput because it does not back off upon packet drops, but this comes at the expense of overwhelming router queues.
+          <div className="mt-3 text-xs text-slate-500 bg-slate-50/80 p-3 rounded-xl border border-slate-200 leading-relaxed">
+            <strong className="text-slate-800">Analytical Insight:</strong> UDP achieves slightly higher raw throughput because it does not throttle upon buffer drops, but at the cost of high loss rates.
           </div>
-        </div>
+        </Card>
 
         {/* Chart 2: Packet Loss Comparison */}
-        <div className="p-5 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#0F172A]">Packet Loss Rate Comparison (%)</h3>
-              <p className="text-[11px] text-slate-500">Percentage of packets dropped at router queues</p>
-            </div>
-            <TrendingDown className="w-4 h-4 text-rose-600" />
-          </div>
+        <Card
+          title="Packet Loss Rate Comparison (%)"
+          subtitle="Percentage of unique packets discarded at bottleneck router queues"
+          icon={TrendingDown}
+        >
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <BarChart data={comparisonData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                 <XAxis dataKey="rate" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit="%" />
-                <Tooltip />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip unit="%" />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="tcpLoss" name="TCP Packet Loss (%)" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="udpLoss" name="UDP Packet Loss (%)" fill="#DC2626" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="tcpLoss" name="TCP Loss (%)" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="udpLoss" name="UDP Loss (%)" fill="#E11D48" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-200">
-            <strong>Key Insight:</strong> UDP experiences up to 2-3x higher packet loss under heavy load because it lacks sender-side congestion feedback.
+          <div className="mt-3 text-xs text-slate-500 bg-slate-50/80 p-3 rounded-xl border border-slate-200 leading-relaxed">
+            <strong className="text-slate-800">Analytical Insight:</strong> UDP suffers up to 2.5x higher packet drop rates under heavy load due to lack of sender-side congestion feedback.
           </div>
-        </div>
+        </Card>
 
         {/* Chart 3: End-to-End Latency */}
-        <div className="p-5 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#0F172A]">Average End-to-End Delay (ms)</h3>
-              <p className="text-[11px] text-slate-500">Queuing buffer time plus link propagation</p>
-            </div>
-            <Clock className="w-4 h-4 text-purple-600" />
-          </div>
+        <Card
+          title="Average End-to-End Delay (ms)"
+          subtitle="Queuing buffer latency plus link propagation time"
+          icon={Clock}
+        >
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={comparisonData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <LineChart data={comparisonData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                 <XAxis dataKey="rate" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit=" ms" />
-                <Tooltip />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip unit="ms" />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="tcpDelay" name="TCP Delay (ms)" stroke="#2563EB" strokeWidth={2} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="udpDelay" name="UDP Delay (ms)" stroke="#9333EA" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="tcpDelay" name="TCP Delay (ms)" stroke="#2563EB" strokeWidth={2.5} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="udpDelay" name="UDP Delay (ms)" stroke="#D97706" strokeWidth={2.5} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-200">
-            <strong>Key Insight:</strong> TCP delay increases during congestion due to retransmission timeouts and buffer queuing, whereas UDP delay remains bounded since dropped packets are discarded immediately.
+          <div className="mt-3 text-xs text-slate-500 bg-slate-50/80 p-3 rounded-xl border border-slate-200 leading-relaxed">
+            <strong className="text-slate-800">Analytical Insight:</strong> TCP delay scales as queue buffers fill before backoff triggers, whereas UDP latency remains bounded since dropped packets are simply discarded.
           </div>
-        </div>
+        </Card>
 
         {/* Chart 4: Packet Delivery Ratio (PDR) */}
-        <div className="p-5 bg-white rounded-xl border border-[#E2E8F0] shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#0F172A]">Packet Delivery Ratio (PDR %)</h3>
-              <p className="text-[11px] text-slate-500">Overall reliability of data delivery</p>
-            </div>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          </div>
+        <Card
+          title="Packet Delivery Ratio (PDR %)"
+          subtitle="Overall end-to-end delivery reliability index"
+          icon={ShieldCheck}
+        >
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <BarChart data={comparisonData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                 <XAxis dataKey="rate" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit="%" domain={[70, 100]} />
-                <Tooltip />
+                <YAxis tick={{ fontSize: 11 }} domain={[65, 100]} />
+                <Tooltip content={<CustomTooltip unit="%" />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="tcpPdr" name="TCP PDR (%)" fill="#16A34A" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="tcpPdr" name="TCP PDR (%)" fill="#10B981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="udpPdr" name="UDP PDR (%)" fill="#F59E0B" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-200">
-            <strong>Key Insight:</strong> TCP maintains high PDR (&gt;90%) across all test cases. For academic portals, examinations, and critical files, TCP is essential. For live video classes, UDP with adaptive codecs is favored.
+          <div className="mt-3 text-xs text-slate-500 bg-slate-50/80 p-3 rounded-xl border border-slate-200 leading-relaxed">
+            <strong className="text-slate-800">Analytical Insight:</strong> TCP maintains &gt;90% PDR across all test cases. For examinations and submission uploads, TCP is non-negotiable.
           </div>
-        </div>
+        </Card>
       </div>
+
+      {/* Multi-Rate Progression Table */}
+      <Card
+        title="Multi-Rate Benchmark Progression Table"
+        subtitle="Side-by-side metric comparison across 5 link bandwidth scales"
+        icon={Layers}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                <th className="px-4 py-3">Bottleneck Bandwidth</th>
+                <th className="px-4 py-3 text-blue-700">TCP Throughput</th>
+                <th className="px-4 py-3 text-amber-700">UDP Throughput</th>
+                <th className="px-4 py-3 text-blue-700">TCP Loss</th>
+                <th className="px-4 py-3 text-rose-700">UDP Loss</th>
+                <th className="px-4 py-3 text-emerald-700">TCP PDR</th>
+                <th className="px-4 py-3 text-amber-700">UDP PDR</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-mono">
+              {comparisonData.map((row, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-4 py-3 font-bold text-slate-900">{row.rate}</td>
+                  <td className="px-4 py-3 font-semibold text-blue-700">{row.tcpThroughput} Kbps</td>
+                  <td className="px-4 py-3 font-semibold text-amber-700">{row.udpThroughput} Kbps</td>
+                  <td className="px-4 py-3 text-slate-600">{row.tcpLoss}%</td>
+                  <td className="px-4 py-3 font-semibold text-rose-600">{row.udpLoss}%</td>
+                  <td className="px-4 py-3 font-bold text-emerald-700">{row.tcpPdr}%</td>
+                  <td className="px-4 py-3 font-semibold text-amber-700">{row.udpPdr}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 };
+
+export default TcpUdpComparison;

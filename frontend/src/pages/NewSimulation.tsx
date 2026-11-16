@@ -1,9 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Play, Sliders, Info, Network, AlertCircle, Zap, ShieldCheck } from 'lucide-react';
+import {
+  Play,
+  Sliders,
+  Info,
+  Network,
+  AlertCircle,
+  Zap,
+  ShieldCheck,
+  Server,
+  Layers,
+  Sparkles,
+  ArrowRight
+} from 'lucide-react';
 import { useDataService } from '../services/dataService';
 import { SimulationConfig } from '../types';
 import { useSimulationMode, ModeBadge, ModeSelector } from '../context/SimulationModeContext';
+import { Card } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
+import { ProtocolBadge, TierBadge } from '../components/Badge';
 
 export const NewSimulation: React.FC = () => {
   const navigate = useNavigate();
@@ -97,10 +112,9 @@ export const NewSimulation: React.FC = () => {
       users: students,
       name: isDemo
         ? `Demo Scenario: ${students} Students (${formData.protocol})`
-        : `Live NS-2: ${level} Load (${students} Students, ${rate})`,
+        : `SimPy Simulation: ${level} Load (${students} Students, ${rate})`,
     });
   };
-
 
   const validateConfig = (): boolean => {
     const errs: { [key: string]: boolean } = {};
@@ -137,6 +151,7 @@ export const NewSimulation: React.FC = () => {
 
     // 6. Experiment type is supported
     const supportedTypes = [
+      'Online Classroom',
       'Normal Traffic',
       'High Traffic',
       'TCP vs UDP',
@@ -178,10 +193,8 @@ export const NewSimulation: React.FC = () => {
       const response = await dataService.runSimulation(payload);
 
       if (isDemo) {
-        // In demo mode: instant results
         navigate(`/experiments/${response.id}`);
       } else {
-        // In real-time mode: navigate to simulation monitor
         navigate(`/monitor?id=${response.id}`);
       }
     } catch (err: any) {
@@ -191,47 +204,42 @@ export const NewSimulation: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Banner */}
-      <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Sliders className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-[#0F172A]">
-                  {isDemo ? 'Demo Scenario Quick Runner' : 'Configure Discrete-Event Network Simulation'}
-                </h2>
-                <ModeBadge isDemo={isDemo} />
-              </div>
-              <p className="text-xs text-[#64748B]">
-                {isDemo
-                  ? 'Instantly select and execute a verified demonstration scenario (zero server dependency)'
-                  : 'Configure SimPy discrete-event simulation: packet generation, TCP AIMD / UDP CBR, bottleneck link serialization, and conservation audit'}
-              </p>
-            </div>
+      <PageHeader
+        title={isDemo ? 'Demo Scenario Quick Runner' : 'Configure Network Simulation'}
+        subtitle={
+          isDemo
+            ? 'Instantly select and execute a verified demonstration scenario (zero server dependency)'
+            : 'Configure discrete-event simulation: packet generation, TCP AIMD / UDP CBR, bottleneck serialization, and conservation audit'
+        }
+        icon={Sliders}
+        badge={
+          <div className="flex items-center gap-2">
+            <ModeBadge isDemo={isDemo} />
+            <TierBadge tier={formData.traffic_level} />
           </div>
-          <ModeSelector compact />
-        </div>
-      </div>
+        }
+        actions={<ModeSelector compact />}
+      />
 
       {/* Official Benchmark Quick-Preset Banner */}
       {!isDemo && (
-        <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+        <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
                   Academic Benchmark Profile
                 </span>
-                <span className="text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
                   10 Students • 10 Mbps • 5s • Seed 42
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-800 mt-0.5">
+              <p className="text-xs text-emerald-800 mt-0.5">
                 Load the approved Online Classroom benchmark parameters yielding 11,998 unique packets with 100% PDR.
               </p>
             </div>
@@ -239,53 +247,54 @@ export const NewSimulation: React.FC = () => {
           <button
             type="button"
             onClick={handleBenchmarkPreset}
-            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors whitespace-nowrap self-stretch sm:self-auto text-center"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors whitespace-nowrap self-stretch sm:self-auto text-center flex items-center justify-center gap-1.5"
           >
-            Apply Official Benchmark
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Apply Official Benchmark</span>
           </button>
         </div>
       )}
 
       {/* Demo Mode Scenario Selector */}
       {isDemo && (
-        <div className="p-5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-blue-600" />
-              Predefined Demo Scenarios
-            </span>
-            <span className="text-[11px] font-mono text-blue-700">Instant Execution</span>
+        <Card
+          title="Predefined Demo Scenarios"
+          subtitle="Select a calibrated student concurrency cohort for instant offline metrics"
+          icon={Zap}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+            {[10, 25, 50, 100, 200].map((count) => {
+              const isSelected = formData.users === count;
+              return (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => handleDemoPreset(count)}
+                  className={`p-3.5 rounded-xl border text-center transition-all ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20 ring-2 ring-blue-500/30'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/40'
+                  }`}
+                >
+                  <div className="text-lg font-bold font-mono">{count}</div>
+                  <div className={`text-[10px] font-semibold uppercase tracking-wider ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                    Active Nodes
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          <p className="text-xs text-blue-800">
-            Select a predefined concurrency level to load calibrated laboratory metrics without running NS-2:
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {[10, 25, 50, 100, 200].map((count) => (
-              <button
-                key={count}
-                type="button"
-                onClick={() => handleDemoPreset(count)}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                  formData.users === count
-                    ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/20'
-                    : 'bg-white border border-blue-200 text-blue-800 hover:bg-blue-100'
-                }`}
-              >
-                {count} Users
-              </button>
-            ))}
-          </div>
-        </div>
+        </Card>
       )}
 
       {/* Validation / Execution Notice */}
       {error && (
-        <div className="p-5 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 text-xs space-y-2 shadow-xs">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-900 text-xs space-y-2 shadow-xs">
           <div className="flex items-center gap-2 font-bold text-rose-950 text-sm">
             <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
             <span>Simulation Configuration Notice</span>
           </div>
-          <p className="font-semibold whitespace-pre-line">{error}</p>
+          <p className="font-semibold whitespace-pre-line text-rose-800">{error}</p>
           {!isDemo && (
             <div className="pt-2 flex items-center gap-3">
               <button
@@ -294,32 +303,128 @@ export const NewSimulation: React.FC = () => {
                   setMode('demo');
                   setError(null);
                 }}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs"
               >
                 Use Demo Mode (Sample Data)
               </button>
               <Link
                 to="/settings"
-                className="px-3.5 py-2 bg-white border border-rose-300 hover:bg-rose-100 text-rose-900 font-semibold rounded-lg text-xs transition-colors"
+                className="px-3.5 py-1.5 bg-white border border-rose-300 hover:bg-rose-100 text-rose-900 font-semibold rounded-lg text-xs transition-colors"
               >
-                Check NS-2 Setup Guide
+                Engine Diagnostics
               </Link>
             </div>
           )}
         </div>
       )}
 
-      {/* Form Content */}
+      {/* Main Configuration Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-xs space-y-5">
-          <h3 className="text-sm font-bold text-[#0F172A] border-b border-[#F1F5F9] pb-3">
-            Simulation Parameters
-          </h3>
+        {/* Workload Tier Cards */}
+        <Card
+          title="Workload Intensity Profile"
+          subtitle="Select a pre-calibrated concurrency tier or define custom parameters"
+          icon={Layers}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { level: 'Low', label: 'LOW Load', desc: '10 Students • 512 Kbps', color: 'emerald' },
+              { level: 'Medium', label: 'MEDIUM Load', desc: '50 Students • 1 Mbps', color: 'blue' },
+              { level: 'High', label: 'HIGH Load', desc: '150 Students • 2 Mbps', color: 'amber' },
+              { level: 'Custom', label: 'CUSTOM', desc: 'Manual parameter controls', color: 'purple' },
+            ].map((tier) => {
+              const isSelected = formData.traffic_level === tier.level;
+              return (
+                <button
+                  key={tier.level}
+                  type="button"
+                  onClick={() => handleTrafficPreset(tier.level as any)}
+                  className={`p-4 rounded-xl border text-left transition-all relative ${
+                    isSelected
+                      ? 'bg-blue-50/70 border-blue-500 shadow-sm ring-2 ring-blue-500/20'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-slate-900">{tier.label}</span>
+                    <TierBadge tier={tier.level as any} />
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{tier.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
 
-          {/* Name & Description */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Transport Protocol Selection Radio Cards */}
+        <Card
+          title="Transport Layer Protocol"
+          subtitle="Choose between reliable congestion-controlled TCP or unthrottled UDP streaming"
+          icon={Network}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* TCP Card */}
+            <div
+              onClick={() => setFormData({ ...formData, protocol: 'TCP' })}
+              className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                formData.protocol === 'TCP'
+                  ? 'bg-blue-50/60 border-blue-500 shadow-sm ring-2 ring-blue-500/20'
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ProtocolBadge protocol="TCP" />
+                  <span className="text-xs font-bold text-slate-900">TCP (NewReno AIMD)</span>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  formData.protocol === 'TCP' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                }`}>
+                  {formData.protocol === 'TCP' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Sliding window with additive increase & multiplicative decrease. Recovers from drops through fast retransmit and timeout backoff.
+              </p>
+            </div>
+
+            {/* UDP Card */}
+            <div
+              onClick={() => setFormData({ ...formData, protocol: 'UDP' })}
+              className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                formData.protocol === 'UDP'
+                  ? 'bg-amber-50/60 border-amber-500 shadow-sm ring-2 ring-amber-500/20'
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ProtocolBadge protocol="UDP" />
+                  <span className="text-xs font-bold text-slate-900">UDP (Constant Bit Rate)</span>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  formData.protocol === 'UDP' ? 'border-amber-600 bg-amber-600' : 'border-slate-300'
+                }`}>
+                  {formData.protocol === 'UDP' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Unthrottled fixed-rate packet injection without flow or congestion control. Packets arriving at full queues are dropped immediately.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Detailed Simulation Parameters Card */}
+        <Card
+          title="Network & Workload Parameters"
+          subtitle="Configure node counts, link constraints, buffers, and discrete-event duration"
+          icon={Sliders}
+        >
+          {/* Experiment Identification */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-slate-100">
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
                 Experiment Name <span className="text-rose-500">*</span>
               </label>
               <input
@@ -330,31 +435,31 @@ export const NewSimulation: React.FC = () => {
                   setFormData({ ...formData, name: e.target.value });
                   if (validationErrors.name) setValidationErrors({ ...validationErrors, name: false });
                 }}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#F8FAFC] ${
-                  validationErrors.name ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50 ${
+                  validationErrors.name ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
                 placeholder="e.g. 50-Node Peak Lecture Simulation"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Description</label>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">Description / Notes</label>
               <input
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#F8FAFC]"
-                placeholder="Evaluation objectives and link attributes"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                placeholder="Evaluation objectives and study constraints"
               />
             </div>
           </div>
 
-          {/* Network Load Configuration */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            {/* Student Clients */}
+          {/* Core Topology Parameters Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+            {/* Student Nodes */}
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
-                Number of Students (Nodes) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Student Nodes (1-250) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -365,42 +470,26 @@ export const NewSimulation: React.FC = () => {
                   setFormData({ ...formData, users: parseInt(e.target.value, 10) || 0 });
                   if (validationErrors.users) setValidationErrors({ ...validationErrors, users: false });
                 }}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono ${
-                  validationErrors.users ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold ${
+                  validationErrors.users ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
               />
-              <p className="text-[11px] text-slate-400 mt-1">Concurrently active student nodes</p>
+              <p className="text-[11px] text-slate-400 mt-1">Concurrently transmitting nodes</p>
             </div>
 
-            {/* Transport Protocol */}
+            {/* Bottleneck Bandwidth */}
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Protocol <span className="text-rose-500">*</span></label>
-              <select
-                value={formData.protocol}
-                onChange={(e) => setFormData({ ...formData, protocol: e.target.value as 'TCP' | 'UDP' })}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold ${
-                  validationErrors.protocol ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
-                }`}
-              >
-                <option value="TCP">TCP (NewReno with Congestion Control)</option>
-                <option value="UDP">UDP (CBR Constant Bit Rate Stream)</option>
-              </select>
-              <p className="text-[11px] text-slate-400 mt-1">
-                {formData.protocol === 'TCP' ? 'Reliable sliding window stream' : 'Uncontrolled loss-tolerant stream'}
-              </p>
-            </div>
-
-            {/* Bottleneck Data Rate */}
-            <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Data Rate <span className="text-rose-500">*</span></label>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Bottleneck Data Rate <span className="text-rose-500">*</span>
+              </label>
               <select
                 value={formData.data_rate}
                 onChange={(e) => {
                   setFormData({ ...formData, data_rate: e.target.value });
                   if (validationErrors.data_rate) setValidationErrors({ ...validationErrors, data_rate: false });
                 }}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono ${
-                  validationErrors.data_rate ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold ${
+                  validationErrors.data_rate ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
               >
                 <option value="256 Kbps">256 Kbps (Severe Bottleneck)</option>
@@ -408,31 +497,14 @@ export const NewSimulation: React.FC = () => {
                 <option value="1 Mbps">1 Mbps (Standard Campus)</option>
                 <option value="2 Mbps">2 Mbps (High Speed)</option>
                 <option value="5 Mbps">5 Mbps (High Concurrency)</option>
-                <option value="10 Mbps">10 Mbps (High Speed / Official Benchmark)</option>
+                <option value="10 Mbps">10 Mbps (Academic Benchmark)</option>
               </select>
               <p className="text-[11px] text-slate-400 mt-1">Bandwidth between R1 and R2</p>
             </div>
-          </div>
 
-          {/* Traffic Level, Delay & Duration */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {/* Link Propagation Delay */}
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Traffic Intensity</label>
-              <select
-                value={formData.traffic_level}
-                onChange={(e) => handleTrafficPreset(e.target.value as any)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold"
-              >
-                <option value="Low">LOW Preset (10 Students, 512 Kbps)</option>
-                <option value="Medium">MEDIUM Preset (50 Students, 1 Mbps)</option>
-                <option value="High">HIGH Preset (150 Students, 2 Mbps)</option>
-                <option value="Custom">Custom (Manual Student & Rate Config)</option>
-              </select>
-              <p className="text-[11px] text-slate-400 mt-1">Preset configuration profile</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
                 Link Delay <span className="text-rose-500">*</span>
               </label>
               <select
@@ -441,8 +513,8 @@ export const NewSimulation: React.FC = () => {
                   setFormData({ ...formData, delay: e.target.value });
                   if (validationErrors.delay) setValidationErrors({ ...validationErrors, delay: false });
                 }}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono ${
-                  validationErrors.delay ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold ${
+                  validationErrors.delay ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
               >
                 <option value="5ms">5ms (Campus LAN / Low Latency)</option>
@@ -451,16 +523,43 @@ export const NewSimulation: React.FC = () => {
                 <option value="50ms">50ms (Intercity WAN)</option>
                 <option value="100ms">100ms (High Latency Link)</option>
               </select>
-              <p className="text-[11px] text-slate-400 mt-1">Propagation delay between R1 and R2</p>
+              <p className="text-[11px] text-slate-400 mt-1">One-way R1-R2 propagation delay</p>
+            </div>
+          </div>
+
+          {/* Scenario & Duration Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Scenario Selection (Experiment Type) <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={formData.experiment_type}
+                onChange={(e) => setFormData({ ...formData, experiment_type: e.target.value })}
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold ${
+                  validationErrors.experiment_type ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
+                }`}
+              >
+                <option value="Online Classroom">Online Classroom (Official Academic Benchmark)</option>
+                <option value="Normal Traffic">Normal Traffic (Standard Campus E-Learning)</option>
+                <option value="High Traffic">High Traffic (Peak Concurrency Lecture Load)</option>
+                <option value="TCP vs UDP">TCP vs UDP Protocol Benchmark</option>
+                <option value="Leaky Bucket">Leaky Bucket Traffic Shaping Evaluation</option>
+                <option value="Sliding Window">Sliding Window Reliability Analysis</option>
+                <option value="Go-Back-N">Go-Back-N ARQ Retransmission</option>
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">Target analytical scenario context</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">Simulation Duration <span className="text-rose-500">*</span></label>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Simulation Duration <span className="text-rose-500">*</span>
+              </label>
               <select
                 value={formData.simulation_time}
                 onChange={(e) => setFormData({ ...formData, simulation_time: parseFloat(e.target.value) })}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
-                  validationErrors.simulation_time ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold ${
+                  validationErrors.simulation_time ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
               >
                 <option value={5}>5 Seconds (Official Benchmark / Fast Run)</option>
@@ -470,57 +569,35 @@ export const NewSimulation: React.FC = () => {
                 <option value={90}>90 Seconds (Steady State)</option>
                 <option value={120}>120 Seconds (Extended Benchmark)</option>
               </select>
-              <p className="text-[11px] text-slate-400 mt-1">Discrete-event observation interval</p>
+              <p className="text-[11px] text-slate-400 mt-1">Simulated time elapsed in discrete-event engine</p>
             </div>
           </div>
 
-          {/* Scenario Selection */}
-          <div className="pt-2">
-            <label className="block text-xs font-semibold text-[#0F172A] mb-1">Scenario Selection (Experiment Type) <span className="text-rose-500">*</span></label>
-            <select
-              value={formData.experiment_type}
-              onChange={(e) => setFormData({ ...formData, experiment_type: e.target.value })}
-              className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium ${
-                validationErrors.experiment_type ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
-              }`}
-            >
-              <option value="Online Classroom">Online Classroom (Official Academic Benchmark)</option>
-              <option value="Normal Traffic">Normal Traffic (Standard Campus E-Learning)</option>
-              <option value="High Traffic">High Traffic (Peak Concurrency Lecture Load)</option>
-              <option value="TCP vs UDP">TCP vs UDP Protocol Benchmark</option>
-              <option value="Leaky Bucket">Leaky Bucket Traffic Shaping Evaluation</option>
-              <option value="Sliding Window">Sliding Window Reliability Analysis</option>
-              <option value="Go-Back-N">Go-Back-N ARQ Retransmission</option>
-            </select>
-            <p className="text-[11px] text-slate-400 mt-1">Target academic study scenario</p>
-          </div>
-
-          {/* Packet Size & Window Size Tuning */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          {/* Packet & Window Tuning */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
-                Packet Size (Bytes) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Packet MTU Size (Bytes) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
                 min={64}
                 max={9000}
-                value={formData.packet_size || 1024}
+                value={formData.packet_size || 512}
                 onChange={(e) => {
                   setFormData({ ...formData, packet_size: parseInt(e.target.value, 10) || 0 });
                   if (validationErrors.packet_size) setValidationErrors({ ...validationErrors, packet_size: false });
                 }}
-                className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono ${
-                  validationErrors.packet_size ? 'border-rose-500 ring-2 ring-rose-200' : 'border-[#CBD5E1]'
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold ${
+                  validationErrors.packet_size ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
-                placeholder="1024"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Payload MTU size (512 for Online Classroom, 1024 standard)</p>
+              <p className="text-[11px] text-slate-400 mt-1">Payload MTU (512 for benchmark, 1024 standard)</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
-                TCP Window Size (Packets)
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                TCP Window Size (Frames)
               </label>
               <input
                 type="number"
@@ -528,18 +605,17 @@ export const NewSimulation: React.FC = () => {
                 max={128}
                 value={formData.window_size || 32}
                 onChange={(e) => setFormData({ ...formData, window_size: parseInt(e.target.value, 10) || 32 })}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono"
-                placeholder="32"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Maximum unacknowledged packets inflight</p>
+              <p className="text-[11px] text-slate-400 mt-1">Maximum unacknowledged inflight packets</p>
             </div>
           </div>
 
-          {/* Advanced Tuning: PRNG Seed & Queue Limit */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          {/* Seed & Queue Limit */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[#0F172A]">
+                <label className="text-xs font-semibold text-slate-800">
                   Random Seed (Reproducibility)
                 </label>
                 <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
@@ -564,22 +640,22 @@ export const NewSimulation: React.FC = () => {
                 disabled={!useCustomSeed}
                 value={useCustomSeed ? (formData.seed ?? 42) : ''}
                 onChange={(e) => setFormData({ ...formData, seed: parseInt(e.target.value, 10) || 0 })}
-                className={`w-full px-3 py-2 text-xs rounded-lg border font-mono ${
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border font-mono font-semibold ${
                   useCustomSeed
-                    ? 'border-[#CBD5E1] bg-white text-slate-900 focus:ring-2 focus:ring-blue-500'
+                    ? 'border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500'
                     : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`}
-                placeholder={useCustomSeed ? '42' : 'Random seed generated automatically by PRNG'}
+                placeholder={useCustomSeed ? '42' : 'Random seed generated per run'}
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 {useCustomSeed
-                  ? 'Deterministic seed (42 reproduces exact official benchmark metrics)'
-                  : 'Automatic PRNG seed generated independently per execution'}
+                  ? 'Deterministic PRNG seed (42 matches official benchmark)'
+                  : 'Automatic PRNG random seed generated at runtime'}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
                 Router Queue Capacity (Packets)
               </label>
               <input
@@ -588,39 +664,44 @@ export const NewSimulation: React.FC = () => {
                 max={500}
                 value={formData.queue_capacity || 50}
                 onChange={(e) => setFormData({ ...formData, queue_capacity: parseInt(e.target.value, 10) || 50 })}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono"
-                placeholder="50"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono font-semibold"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Bottleneck router queue limit before packet drop</p>
+              <p className="text-[11px] text-slate-400 mt-1">Bottleneck router buffer limit before Tail-Drop</p>
             </div>
           </div>
-        </div>
+        </Card>
 
-        {/* Topology Summary Preview */}
-        <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-[#E2E8F0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {/* Topology Summary Live Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-md border border-slate-700/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Network className="w-6 h-6 text-blue-600 flex-shrink-0" />
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
+              <Network className="w-5 h-5 text-blue-400" />
+            </div>
             <div>
-              <h4 className="text-xs font-bold text-[#0F172A]">Simulated Network Topology Plan</h4>
-              <p className="text-[11px] text-[#64748B] break-words">
-                {formData.users} Student Nodes (10Mb, 5ms) ➔ Access Router R1 ➔ [{formData.data_rate}, {formData.delay || '20ms'}, Queue: {formData.queue_capacity || 50} pkts, {formData.experiment_type === 'Leaky Bucket' ? 'LeakyBucketQueue' : 'DropTail'}] ➔ Core Router R2 ➔ LMS Server (100Mb)
+              <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider">
+                Simulated Campus Network Path
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {formData.users} Nodes (10Mb, 5ms) ➔ R1 Access Router ➔ [{formData.data_rate}, {formData.delay || '20ms'}, Queue: {formData.queue_capacity || 50} pkts] ➔ R2 Core Router ➔ LMS Server (100Mb)
               </p>
             </div>
           </div>
-          <span className="text-xs font-mono font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded whitespace-nowrap self-start sm:self-auto">
-            {formData.protocol} • {formData.simulation_time}s {useCustomSeed ? `• Seed ${formData.seed ?? 42}` : '• Random Seed'}
-          </span>
+          <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+            <span className="font-mono text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              {formData.protocol} • {formData.simulation_time}s {useCustomSeed ? `• Seed ${formData.seed ?? 42}` : '• Dynamic PRNG'}
+            </span>
+          </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="flex justify-end gap-3">
+        {/* Submission CTA */}
+        <div className="flex justify-end gap-3 pt-2">
           <button
             type="submit"
             disabled={submitting}
-            className={`w-full sm:w-auto flex items-center justify-center gap-2 font-bold text-xs px-6 py-3 rounded-lg shadow-sm transition-all disabled:opacity-50 text-white ${
+            className={`w-full sm:w-auto flex items-center justify-center gap-2.5 font-bold text-xs px-8 py-3.5 rounded-xl shadow-md transition-all disabled:opacity-50 text-white ${
               isDemo
-                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
-                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25'
+                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25'
             }`}
           >
             <Play className="w-4 h-4 fill-white" />
@@ -628,14 +709,17 @@ export const NewSimulation: React.FC = () => {
               {submitting
                 ? isDemo
                   ? 'Loading Demo Experiment...'
-                  : 'Executing SimPy Discrete-Event Engine...'
+                  : 'Executing Discrete-Event Engine...'
                 : isDemo
-                ? '▶ Run Demo Experiment'
-                : '▶ RUN DISCRETE-EVENT SIMULATION'}
+                ? 'RUN DEMO EXPERIMENT'
+                : 'RUN DISCRETE-EVENT SIMULATION'}
             </span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </form>
     </div>
   );
 };
+
+export default NewSimulation;

@@ -1,5 +1,5 @@
 # ==============================================================================
-# EduNet Analyzer - Backend Dockerfile (with Native NS-2 Engine)
+# CampusNet Analyzer - Backend Dockerfile (SimPy Discrete-Event Simulation Engine)
 # ==============================================================================
 FROM python:3.11-slim
 
@@ -7,16 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
     HOST=0.0.0.0 \
+    DATA_DIR=/app/data \
     SIMULATION_DIR=/app/simulation
 
 WORKDIR /app
 
-# Install build dependencies and NS-2 (Network Simulator 2) suite
+# Install system utilities (curl for container healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
-    ns2 \
-    nam \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend dependencies
@@ -26,8 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application source
 COPY . /app
 
-# Create simulation and trace directories
-RUN mkdir -p /app/simulation/generated /app/simulation/traces /app/reports
+# Create persistent data, simulation and trace directories
+RUN mkdir -p /app/data /app/simulation/generated /app/simulation/traces /app/reports
 
 EXPOSE 8000
 

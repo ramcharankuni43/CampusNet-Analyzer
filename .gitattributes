@@ -1,0 +1,6 @@
+# Declare binary files
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
